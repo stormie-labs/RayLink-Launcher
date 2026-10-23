@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280, height=760">
+<title>QuarkNET — B · Герой</title>
+<link rel="stylesheet" href="shared/base.css">
+<script src="shared/icons.js"></script>
+<style>
+/* Direction B · «Атмосферный лаунчер» — full-bleed frame from the game, HUD-white type, compass-strip navigation.
+ * tone: cinematic, calm · anchor: sand #D9B160 = the one primary action (host colour in the coop palette) */
+:root {
+  --night: #0A0C0B;
+  --scrim: rgba(9, 11, 10, .9);
+  --panel: rgba(10, 12, 11, .74);
+  --white: #F4F5F6;                      /* HUD v2 white */
+  --white-2: rgba(244, 245, 246, .7);
+  --white-3: rgba(244, 245, 246, .52);
+  --line: rgba(244, 245, 246, .14);
+  --line-2: rgba(244, 245, 246, .26);
+  --sand: #D9B160;                       /* CTA only */
+  --sand-hi: #E6C27A;
+  --sand-ink: #17130A;
+  --ok: #92BE9A;
+  --down: #E23A30;
+  --shadow-1: 0 1px 0 rgba(0, 0, 0, .55); /* the HUD's 1 px text shadow */
+  --font-ui: Bahnschrift, "Sofia Sans", sans-serif;
+  --font-display: Bahnschrift, "Sofia Sans Condensed", sans-serif;
+  --font-data: "JetBrains Mono", Consolas, monospace;
+  --ease-out: cubic-bezier(.2, .8, .2, 1);
+  --dur-fast: 120ms;
+  --dur-mid: 240ms;
+  --dur-slow: 1200ms;
+}
+body { background: var(--night); color: var(--white); font: 400 14px/1.45 var(--font-ui); }
+
+/* ---------- the frame ---------- */
+.art { position: absolute; inset: 0; overflow: hidden; }
+.art img { position: absolute; left: -20px; top: 0; width: 1533px; height: 760px; object-fit: cover;
+           filter: saturate(.74) contrast(1.06) brightness(.9); animation: push var(--dur-slow) var(--ease-out) both; }
+@keyframes push { from { transform: scale(1.035); opacity: .2; } to { transform: none; opacity: 1; } }
+.art::after { content: ""; position: absolute; inset: 0;
+  background:
+    linear-gradient(180deg, rgba(9,11,10,.72) 0, rgba(9,11,10,0) 132px),
+    linear-gradient(90deg, rgba(9,11,10,.93) 0, rgba(9,11,10,.78) 300px, rgba(9,11,10,.18) 640px, rgba(9,11,10,0) 760px),
+    linear-gradient(0deg, rgba(9,11,10,.97) 0, rgba(9,11,10,.86) 150px, rgba(9,11,10,0) 330px),
+    radial-gradient(60% 50% at 62% 48%, rgba(217,177,96,.10), transparent 70%); }
+
+/* ---------- title bar ---------- */
+.title { position: relative; height: 36px; display: flex; align-items: center; padding-left: 18px; gap: 10px; z-index: 2; }
+.brand { display: flex; align-items: center; gap: 9px; text-shadow: var(--shadow-1); }
+.brand svg { width: 20px; height: 20px; color: var(--white); filter: drop-shadow(var(--shadow-1)); }
+.brand b { font: 600 17px/1 var(--font-display); font-stretch: 75%; letter-spacing: .02em; }
+.title .grow { flex: 1; align-self: stretch; }
+.who { display: flex; align-items: center; gap: 8px; padding: 0 12px; height: 26px; color: var(--white-2); margin-right: 6px; }
+.who svg.i { width: 15px; height: 15px; }
+.who:hover { color: var(--white); background: rgba(244,245,246,.08); }
+.win { width: 46px; height: 36px; display: grid; place-items: center; color: var(--white-2); }
+.win:hover { background: rgba(244,245,246,.1); color: var(--white); }
+.win.x:hover { background: var(--down); color: #fff; }
+.win svg.i { width: 16px; height: 16px; stroke-width: 1.5; }
+
+/* ---------- compass navigation (same scale as the in-game HUD v2 compass) ---------- */
+.compass { position: absolute; z-index: 2; left: 280px; top: 40px; width: 720px; height: 64px;
+           -webkit-mask: linear-gradient(90deg, transparent 0, #000 16%, #000 84%, transparent 100%);
+                   mask: linear-gradient(90deg, transparent 0, #000 16%, #000 84%, transparent 100%); }
+.compass .line { position: absolute; left: 0; right: 0; top: 30px; height: 1px; background: rgba(244,245,246,.8); box-shadow: var(--shadow-1); }
+.compass .ticks { position: absolute; left: 0; right: 0; top: 31px; height: 6px;
+  background:
+    linear-gradient(90deg, rgba(244,245,246,.9) 1px, transparent 1px) 0 0 / 90px 6px repeat-x,
+    linear-gradient(90deg, rgba(244,245,246,.7) 1px, transparent 1px) 0 0 / 30px 4px repeat-x,
+    linear-gradient(90deg, rgba(244,245,246,.5) 1px, transparent 1px) 0 0 / 10px 2px repeat-x; }
+.compass a { position: absolute; top: 6px; transform: translateX(-50%); color: var(--white); text-decoration: none;
+             font: 500 15px/1 var(--font-ui); text-shadow: var(--shadow-1); white-space: nowrap; padding: 2px 4px; }
+.compass a:hover { opacity: 1 !important; }
+.compass a[aria-current="page"] { font-weight: 700; }
+.compass .heading { position: absolute; left: 360px; top: 40px; transform: translateX(-50%); width: 0; height: 0;
+  border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 8px solid var(--white);
+  filter: drop-shadow(var(--shadow-1)); }
+.compass .deg { position: absolute; left: 360px; top: 50px; transform: translateX(-50%); font: 500 10px/1 var(--font-data);
+                color: var(--white-3); }
+
+/* ---------- hero ---------- */
+.hero { position: absolute; left: 56px; top: 206px; z-index: 1; text-shadow: var(--shadow-1); }
+.hero .for { color: var(--white-2); font-size: 15px; letter-spacing: .01em; }
+.hero h1 { margin: 6px 0 0 -4px; font: 700 112px/.86 var(--font-display); font-stretch: 75%; letter-spacing: -.005em; }
+.hero p { margin: 18px 0 0; color: var(--white-2); font-size: 16px; max-width: 30ch; }
+
+/* ---------- what's new ---------- */
+.news { position: absolute; z-index: 1; right: 32px; top: 128px; width: 352px; bottom: 56px; background: var(--panel);
+        border: 1px solid var(--line); padding: 20px 22px; display: flex; flex-direction: column; gap: 14px; }
+.news h2 { margin: 0; font: 700 22px/1 var(--font-display); font-stretch: 75%; letter-spacing: .01em;
+           display: flex; justify-content: space-between; align-items: baseline; }
+.news h2 a { font: 400 13px var(--font-ui); color: var(--white-3); text-decoration: none; letter-spacing: 0; }
+.bld header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 9px; }
+.bld header b { font: 700 17px/1 var(--font-display); font-stretch: 75%; }
+.bld header span { color: var(--white-3); font: 500 11px var(--font-data); }
+.bld header em { margin-left: auto; font-style: normal; font-size: 12px; color: var(--ok); }
+.bld ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.bld li { padding-left: 12px; position: relative; color: var(--white); font-size: 13.5px; line-height: 1.4; }
+.bld li::before { content: ""; position: absolute; left: 0; top: 2px; bottom: 2px; width: 2px; background: var(--white-3); }
+.bld li.fix::before { background: var(--ok); }
+.bld li small { display: block; color: var(--white-3); font-size: 12.5px; }
+.bld.old li { color: var(--white-2); }
+.bld + .bld { border-top: 1px solid var(--line); padding-top: 14px; }
+.legend { margin-top: auto; display: flex; gap: 16px; color: var(--white-3); font-size: 12px; }
+.legend span { display: flex; align-items: center; gap: 7px; }
+.legend i { width: 2px; height: 12px; background: var(--white-3); }
+.legend i.fix { background: var(--ok); }
+
+/* ---------- play dock ---------- */
+.dock { position: absolute; z-index: 1; left: 56px; bottom: 56px; display: flex; flex-direction: column; gap: 14px; }
+.dock .row { display: flex; gap: 12px; align-items: stretch; }
+.play { width: 268px; height: 72px; background: var(--sand); color: var(--sand-ink); display: flex; align-items: center; gap: 14px;
+        padding: 0 22px; transition: background var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+        box-shadow: 0 10px 30px -12px rgba(217,177,96,.55); }
+.play:hover { background: var(--sand-hi); }
+.play:active { transform: translateY(1px); }
+.play:focus-visible { outline: 2px solid var(--white); outline-offset: 3px; }
+.play svg.i { width: 24px; height: 24px; }
+.play b { font: 700 38px/1 var(--font-display); font-stretch: 75%; letter-spacing: .05em; }
+.play.busy { width: 300px; background: rgba(244,245,246,.08); color: var(--white); box-shadow: inset 0 0 0 1px var(--line-2);
+             flex-direction: column; align-items: stretch; justify-content: center; gap: 8px; padding: 0 18px; cursor: default; }
+.play.busy .top { display: flex; align-items: center; gap: 10px; font-size: 15px; white-space: nowrap; }
+.play.busy .top b { font-size: 22px; letter-spacing: .01em; }
+.play.busy .top span { margin-left: auto; font: 500 13px var(--font-data); color: var(--white-2); }
+.segs { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 3px; }
+.segs i { height: 5px; background: rgba(244,245,246,.18); position: relative; overflow: hidden; }
+.segs i.on::after { content: ""; position: absolute; inset: 0 34% 0 0; background: var(--sand); }
+
+.pick { display: flex; flex-direction: column; gap: 6px; }
+.mode { display: flex; height: 34px; border: 1px solid var(--line-2); background: rgba(9,11,10,.55); }
+.mode button { padding: 0 14px; display: flex; align-items: center; gap: 8px; color: var(--white-2); font-size: 14px; }
+.mode button[aria-pressed="true"] { background: var(--white); color: var(--night); }
+.mode button:not([aria-pressed="true"]):hover { color: var(--white); background: rgba(244,245,246,.08); }
+.mode svg.i { width: 16px; height: 16px; }
+.addr { display: flex; height: 32px; border: 1px solid var(--line-2); background: rgba(9,11,10,.55); width: 100%; }
+.addr input { flex: 1; min-width: 0; width: 100%; background: none; border: 0; outline: none; padding: 0 10px; font: 500 13px var(--font-data); }
+.addr:focus-within { border-color: var(--white); }
+.addr button { padding: 0 10px; color: var(--white-2); border-left: 1px solid var(--line-2); font-size: 13px; }
+.addr button:hover { color: var(--white); }
+
+.state { display: flex; gap: 22px; align-items: center; color: var(--white-2); font-size: 13.5px; text-shadow: var(--shadow-1); }
+.state span { display: flex; align-items: center; gap: 7px; }
+.state svg.i { width: 15px; height: 15px; stroke-width: 2.2; }
+.state .ok { color: var(--ok); }
+.state b { color: var(--white); font-weight: 600; }
+.state .num { font-family: var(--font-data); font-size: 12.5px; }
+
+/* ---------- footer ---------- */
+.foot { position: absolute; z-index: 1; left: 0; right: 0; bottom: 0; height: 36px; display: flex; align-items: center; gap: 24px;
+        padding: 0 16px 0 56px; color: var(--white-3); font-size: 12.5px; border-top: 1px solid var(--line); background: rgba(9,11,10,.6); }
+.foot span { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+.foot svg.i { width: 14px; height: 14px; stroke-width: 1.6; }
+.foot b { color: var(--white-2); font-weight: 400; font-family: var(--font-data); font-size: 12px; }
+.foot .act { margin-left: auto; display: flex; }
+.foot .act button { height: 36px; padding: 0 12px; display: flex; align-items: center; gap: 7px; color: var(--white-2); }
+.foot .act button:hover { color: var(--white); background: rgba(244,245,246,.06); }
+</style>
+</head>
+<body>
+<div class="art" aria-hidden="true"><img src="shared/img/zone_bunker.jpg" alt=""></div>
+
+<header class="title" data-tauri-drag-region>
+  <div class="brand"><svg aria-hidden="true"><use href="#qn-mark"/></svg><b>QuarkNET</b></div>
+  <div class="grow"></div>
+  <button class="who"><svg class="i"><use href="#i-user"/></svg>Harbinger</button>
+  <button class="win" aria-label="Свернуть"><svg class="i"><use href="#i-min"/></svg></button>
+  <button class="win x" aria-label="Закрыть"><svg class="i"><use href="#i-close"/></svg></button>
+</header>
+
+<nav class="compass" aria-label="Разделы">
+  <div class="line"></div><div class="ticks"></div>
+  <a href="#" style="left:0; opacity:.15">Помощь</a>
+  <a href="#" style="left:180px; opacity:.55">Настройки</a>
+  <a href="#" style="left:360px" aria-current="page">Игра</a>
+  <a href="#" style="left:540px; opacity:.55">Обновления</a>
+  <a href="#" style="left:720px; opacity:.15">Помощь</a>
+  <div class="heading"></div>
+</nav>
+
+<section class="hero">
+  <div class="for">Кооператив для S.T.A.L.K.E.R. Anomaly и G.A.M.M.A</div>
+  <h1>QuarkNET</h1>
+  <p>Тестовый стенд. Зона на двоих — и больше, до пяти игроков.</p>
+</section>
+
+<aside class="news" aria-label="Что нового">
+  <h2>Что нового <a href="#">все сборки</a></h2>
+  <article class="bld only-update">
+    <header><b>Сборка 11</b><span>23.10 22:10</span><em>ставится</em></header>
+    <ul><li>Переход на другую карту можно отменить шагом назад.</li></ul>
+  </article>
+  <article class="bld">
+    <header><b>Сборка 10</b><span>23.10 21:40</span><em class="only-ready">у тебя</em></header>
+    <ul>
+      <li>Группа ждёт всех у перехода на другую карту<small>Хост может уйти сразу — держи F</small></li>
+      <li>Компас показывает метки КПК<small>Тайники, торговцы, своя метка; дальние бледнее</small></li>
+      <li>Над напарником — ник и расстояние<small>Раненого видно сквозь стены</small></li>
+      <li class="fix">Хост не вылетает, пока клиент грузит карту</li>
+    </ul>
+  </article>
+  <article class="bld old">
+    <header><b>Сборка 9</b><span>23.10 18:56</span></header>
+    <ul>
+      <li>Поднять раненого: подойди и держи F три секунды</li>
+      <li>Окно «Кооператив»: новая игра, продолжить, загрузить</li>
+    </ul>
+  </article>
+  <article class="bld old only-ready">
+    <header><b>Сборка 8</b><span>23.10 17:20</span></header>
+    <ul>
+      <li class="fix">Игра не вылетает при выходе в меню</li>
+      <li>23 мода GAMMA работают в коопе, предметы не дюпаются</li>
+    </ul>
+  </article>
+  <div class="legend"><span><i></i>новое</span><span><i class="fix"></i>исправлено</span></div>
+</aside>
+
+<section class="dock">
+  <div class="row">
+    <button class="play only-ready"><svg class="i"><use href="#i-play"/></svg><b>ИГРАТЬ</b></button>
+    <div class="play busy only-update" role="progressbar" aria-valuenow="44" aria-label="Обновление до сборки 11">
+      <div class="top"><svg class="i"><use href="#i-download"/></svg><b>Обновляю до 11</b><span>44 %</span></div>
+      <div class="segs"><i class="on"></i><i></i><i></i></div>
+    </div>
+    <div class="pick">
+      <div class="mode" role="group" aria-label="Режим">
+        <button aria-pressed="false"><svg class="i"><use href="#i-host"/></svg>Создать игру</button>
+        <button aria-pressed="true"><svg class="i"><use href="#i-join"/></svg>Подключиться</button>
+      </div>
+      <div class="addr"><input value="203.0.113.24:27960" aria-label="Адрес друга"><button>Проверить</button></div>
+    </div>
+  </div>
+  <div class="state only-ready">
+    <span class="ok"><svg class="i"><use href="#i-check"/></svg><b>Сборка 10</b>&nbsp;— последняя</span>
+    <span class="ok"><svg class="i"><use href="#i-check"/></svg>у хоста тоже 10, моды совпадают</span>
+  </div>
+  <div class="state only-update">
+    <span>качаю <span class="num">6,2 из 9,4 МБ · 3,1 МБ/с</span></span>
+    <span>затем проверю и поставлю</span>
+    <span>GAMMA не трогаем</span>
+  </div>
+</section>
+
+<footer class="foot">
+  <span><svg class="i"><use href="#i-folder"/></svg>стенд <b>E:\QuarkNET</b></span>
+  <span>слой GAMMA собран <b>23.10</b></span>
+  <div class="act">
+    <button><svg class="i"><use href="#i-logs"/></svg>Отправить логи</button>
+    <button><svg class="i"><use href="#i-rollback"/></svg>Откатить на 9</button>
+    <button aria-label="Настройки"><svg class="i"><use href="#i-sliders"/></svg></button>
+  </div>
+</footer>
+</body>
+</html>
