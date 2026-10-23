@@ -1,4 +1,4 @@
-# QuarkNET Launcher — спецификация v1
+# RayLink Launcher — спецификация v1
 
 Статус: 2026-10-23 23:40, черновик архитектора. Кода нет. План реализации — `docs/PLAN.md`, дизайн — `docs/DESIGN.md`
 (направление B, выбор владельца 23:12), макеты `docs/mockups/home_b.png`, `home_b_update.png`, `design/home-b-hero.html`.
@@ -7,7 +7,7 @@
 - `anomaly-coop/tools/deploy.ps1`, `launch.ps1`, `package.ps1`, `mo2_stand.py`, `temp/build_ci.sh`;
 - `engine/src/xrCoop/coop_protocol.h` (`kProtocolVersion = 10`, `kDefaultPort = 27960`, `kMaxPlayers = 8`) и
   `xrGame/coop/coop_manager.cpp` (`build_id`, `manifest()`);
-- vault: «Ф1 стенд GAMMA из профиля MO2», «F1 three MO2 mods packaging», «W8 presentation and packaging», «QuarkNET
+- vault: «Ф1 стенд GAMMA из профиля MO2», «F1 three MO2 mods packaging», «W8 presentation and packaging», «RayLink
   Launcher», «xrCoop — сетевое ядро на ENet», «NTFS жёсткие ссылки — грабли», «WebView2 reduced motion».
 
 ---
@@ -37,7 +37,7 @@
 
 | Термин | Значение |
 |---|---|
-| Стенд | Отдельная папка тестера, например `E:\QuarkNET`. В ней корень игры `game\` и служебная `.quarknet\` |
+| Стенд | Отдельная папка тестера, например `E:\RayLink`. В ней корень игры `game\` и служебная `.raylink\` |
 | Наш слой | Слои Engine (exe + `engine\gamedata`), Core (`gamedata`) и GAMMA-патчи (`gamedata_gamma`) — то, что выпускаем мы |
 | Слой GAMMA | Включённые моды профиля MO2 и `overwrite` в порядке приоритета MO2. Жёсткие ссылки на файлы тестера |
 | Сборка N | Целый номер, растёт: «Сборка 10». Один номер = один набор файлов нашего слоя |
@@ -149,12 +149,12 @@
 Тексты — DESIGN §11: коротко, по-русски, глаголом. Одно действие — одно имя во всём потоке.
 
 ### 2.1 Оболочка
-- **Заголовок:** знак «три кварка» и «QuarkNET», справа ник (переход в Настройки → Профиль), «свернуть», «закрыть».
+- **Заголовок:** знак «три звена» и «RayLink», справа ник (переход в Настройки → Профиль), «свернуть», «закрыть».
 - **Компас** — разделы на шкале через 90°: **Игра · Обновления · Помощь · Настройки**.
   - Активный раздел под треугольником, соседние бледнее.
   - Q/E и ←/→ поворачивают шкалу, по кругу. Клик по имени — переход.
   - Поворот — `--dur-mid` (240 мс), `--ease-in-out`.
-- **Подвал 36 px:** «стенд `E:\QuarkNET`» (клик — открыть в Проводнике), «слой GAMMA собран 23.10»,
+- **Подвал 36 px:** «стенд `E:\RayLink`» (клик — открыть в Проводнике), «слой GAMMA собран 23.10»,
   справа «Отправить логи», «Откатить на 9» (нет цели — скрыто) и значок настроек.
 - **Тосты** — сверху справа под заголовком, 4 с, не перекрывают док. Ошибки, требующие действия, — не тостом, а в
   месте действия.
@@ -222,7 +222,7 @@
 - Игра запущена: «качаю» и «проверяю» идут, «ставлю» ждёт закрытия игры (строка 3).
 
 ### 2.4 «Обновления»
-- **Сверху — строка канала:** «Канал `owner/quarknet-builds` · свежие · проверено 21:44 · Проверить». Состояния:
+- **Сверху — строка канала:** «Канал `owner/raylink-builds` · свежие · проверено 21:44 · Проверить». Состояния:
   на связи / нет сети / нужен ключ / не найден / лимит GitHub до 22:15 / канал пуст.
 - **Слева — список сборок.** Номер 36 px, дата, значок «протокол 10», метки «у тебя», «в кэше», «на GitHub»,
   «ставится», «закреплена».
@@ -242,9 +242,9 @@
    - Ещё есть пункт «Без GAMMA — чистая Anomaly» и «Указать вручную» (диалог папки).
    - Проверки: у Anomaly есть `db\`, `gamedata\`, `bin\`, `fsgame.ltx`; у MO2 есть `ModOrganizer.ini`,
      `profiles\<p>\modlist.txt` и папка модов; `gamePath` MO2 совпадает с выбранной Anomaly (иначе предупреждение).
-   - **Процессор без AVX** — блок: «Сборка QuarkNET требует AVX — на этом процессоре не запустится».
+   - **Процессор без AVX** — блок: «Сборка RayLink требует AVX — на этом процессоре не запустится».
 2. **Куда ставить стенд.**
-   - Предлагается `<том модов>:\QuarkNET`.
+   - Предлагается `<том модов>:\RayLink`.
    - Галочки: «NTFS», «тот же диск, что Anomaly», «тот же диск, что GAMMA», «папка пустая или это наш стенд»,
      «пробная ссылка создана».
    - «Свободно 412 ГБ · нужно ~3 ГБ» и «Твои Anomaly и GAMMA не меняются».
@@ -303,7 +303,7 @@
 | `ARCHIVE_UNSAFE` | шаг «проверяю» | «Архив сборки пишет за пределы стенда — не ставлю» | Логи |
 | `DISK_FULL` | любой шаг | «На диске E: не хватает 120 МБ» | Повторить |
 | `NOT_NTFS` / `CROSS_VOLUME` / `LINK_FAILED` | мастер, шаг 2 | «Стенд должен быть на диске E: — там же, где GAMMA» | Выбрать папку |
-| `STAND_FOREIGN` | мастер | «Папка не пустая и это не стенд QuarkNET» | Выбрать папку |
+| `STAND_FOREIGN` | мастер | «Папка не пустая и это не стенд RayLink» | Выбрать папку |
 | `STAND_OVERLAP` / `REPARSE_IN_STAND` | мастер, сборка | «Стенд не может лежать внутри GAMMA/Anomaly» / «В стенде ссылка-папка — убери её» | Выбрать папку |
 | `FILE_LOCKED` | «ставлю» | «Файл занят (антивирус?) — повторю через секунду» → после 5 попыток «не удалось» | Повторить |
 | `GAME_RUNNING` | «ставлю» | «Поставлю, когда закроешь игру» | Закрыть игру |
@@ -314,7 +314,7 @@
 | `TXN_RECOVERED` | тост | «Прошлая установка прервалась — довела до 11» / «…вернула 10» | — |
 | `BUILD_NOT_CACHED` | откат | «Сборки 8 нет в кэше — скачаю (6 МБ)» | Продолжить |
 | `ADDRESS_INVALID` | док | «адрес вида 203.0.113.24:27960» | — |
-| `PROBE_TIMEOUT` / `PROBE_UNRESOLVED` / `PROBE_BAD_REPLY` | док | «хост не отвечает — игра у него запущена и мир загружен?» / «имя не найдено» / «по этому адресу не QuarkNET» | Проверить ещё |
+| `PROBE_TIMEOUT` / `PROBE_UNRESOLVED` / `PROBE_BAD_REPLY` | док | «хост не отвечает — игра у него запущена и мир загружен?» / «имя не найдено» / «по этому адресу не RayLink» | Проверить ещё |
 | `GAME_START_FAILED` / `EXE_MISSING` | док | «Игра не запустилась: exe нет — антивирус?» | Помощь → Антивирус |
 | `TOKEN_STORE_FAILED` | канал | «Не удалось сохранить ключ в диспетчере учётных данных Windows» | Повторить |
 
@@ -332,11 +332,11 @@
 ## 3. Канал обновлений
 
 ### 3.1 Репозитории
-- **Сборки:** отдельный репозиторий только для релизов, например `<owner>/quarknet-builds`. Кода в нём нет; коммит
+- **Сборки:** отдельный репозиторий только для релизов, например `<owner>/raylink-builds`. Кода в нём нет; коммит
   с README нужен, чтобы ставить теги.
   - У `anomaly-coop` нет remote (проверено 23:24), у `engine` remote — апстрим xray-monolith. Публиковать код не нужно.
   - Приватный или публичный — решает владелец (§11). Лаунчер поддерживает оба.
-- **Лаунчер:** релизы лаунчера в публичном `<owner>/quarknet-launcher` — для updater, §9. Если отдельного репозитория
+- **Лаунчер:** релизы лаунчера в публичном `<owner>/raylink-launcher` — для updater, §9. Если отдельного репозитория
   не будет, — тег `launcher-vX.Y.Z` в том же репозитории с `--latest=false`, чтобы `/releases/latest` оставался за
   сборками.
 - **Тег сборки** — `build-<N>`, имя релиза «Сборка N», тело — changelog для игрока (markdown).
@@ -363,7 +363,7 @@ UTF-8 без BOM, LF. Пример:
 ```json
 {
   "schema": 1,
-  "product": "quarknet",
+  "product": "raylink",
   "build": 11,
   "publishedAt": "2026-10-23T22:10:00+03:00",
   "prerelease": true,
@@ -399,7 +399,7 @@ UTF-8 без BOM, LF. Пример:
 ```
 
 Правила (валидатор `qn-core::manifest`, он же `qn-tool manifest check` для `publish.ps1`):
-- `schema = 1`, `product = "quarknet"`. Неизвестная `schema` — ошибка. Неизвестные поля игнорируются: так
+- `schema = 1`, `product = "raylink"`. Неизвестная `schema` — ошибка. Неизвестные поля игнорируются: так
   новые поля не ломают старый лаунчер.
 - `build` ≥ 1. `protocol` и `maxPlayers` > 0. `minLauncher` — semver.
 - `changelog[].kind` ∈ `new | fix | change | known`; `text` ≤ 200 символов, `hint` ≤ 200.
@@ -417,7 +417,7 @@ UTF-8 без BOM, LF. Пример:
   - Слой gamma ставится только в стенд GAMMA; в стенде чистой Anomaly его нет, как и в `package.ps1`.
 
 ### 3.4 Как лаунчер узнаёт о новой сборке
-- Заголовки: `User-Agent: QuarkNET-Launcher/<ver>`, `Accept: application/vnd.github+json`,
+- Заголовки: `User-Agent: RayLink-Launcher/<ver>`, `Accept: application/vnd.github+json`,
   `X-GitHub-Api-Version: 2022-11-28`. С ключом добавляется `Authorization: Bearer <token>`.
 - **Стабильные:** `GET https://api.github.com/repos/{o}/{r}/releases/latest`.
 - **Свежие:** `GET /repos/{o}/{r}/releases?per_page=20`. Из ответа берутся релизы с тегом `build-<N>`, не draft;
@@ -437,7 +437,7 @@ UTF-8 без BOM, LF. Пример:
   срок ≤ 1 года.
   - Владелец делает один такой ключ и передаёт друзьям лично; или каждый тестер — коллаборатор со своим ключом.
 - Хранится **только** в диспетчере учётных данных Windows: generic credential, цель
-  `QuarkNET Launcher:github:<owner>/<repo>`, крейт `keyring` (windows-native).
+  `RayLink Launcher:github:<owner>/<repo>`, крейт `keyring` (windows-native).
   - Не хранится в `settings.json`, логах, архиве логов, URL, переменных окружения, состоянии фронтенда.
 - **Ввод:** поле-пароль → команда `channel_set_token`.
   - Rust сразу проверяет ключ: `GET /repos/{o}/{r}` с ключом, нужен `200`. Только после этого сохраняет.
@@ -452,7 +452,7 @@ UTF-8 без BOM, LF. Пример:
   - Редиректы **обрабатываются вручную** (`Policy::none()`): только `https`, хост из белого списка
     `api.github.com`, `github.com`, `objects.githubusercontent.com`, `release-assets.githubusercontent.com`.
   - Следующий запрос идёт **без** `Authorization`.
-- **Кэш:** паки — `<стенд>\.quarknet\packs\<sha256>.zip`. Пак с совпадающим sha уже лежит → не качается.
+- **Кэш:** паки — `<стенд>\.raylink\packs\<sha256>.zip`. Пак с совпадающим sha уже лежит → не качается.
 - **Докачка:** `.part` + `Range: bytes=<n>-`.
   - Сервер ответил `200` вместо `206` — качаем заново.
   - Подписанный URL протух (`403`) — берём новый через API.
@@ -469,14 +469,14 @@ UTF-8 без BOM, LF. Пример:
 
 1. **Качаю.** Недостающие паки → кэш (§3.6).
 2. **Проверяю.**
-   - Каждый пак распаковывается в `.quarknet\builds\<N>.tmp\layer\<слой>\<путь>` по правилам §8.4.
+   - Каждый пак распаковывается в `.raylink\builds\<N>.tmp\layer\<слой>\<путь>` по правилам §8.4.
    - У каждого файла сверяются размер и sha256 с манифестом. Лишний файл в паке — `ARCHIVE_UNSAFE`.
    - Затем `rename(<N>.tmp → <N>)` — атомарно на одном томе — и маркер `.verified` с sha манифеста.
 3. **Ставлю.**
    - Проверка «игра не запущена»: процессы с образом внутри `game\`, §5.5. Запущена → ждём (`waitingGame`).
    - План: `want(индекс GAMMA, сборка N)` против манифеста стенда — список операций «положить» и «убрать».
      Для обновления нашего слоя это сотни операций, сканирования GAMMA нет.
-   - Журнал `.quarknet\txn.json` = `{id, from, to, gammaIndexSha, startedAt}` пишется (tmp + rename) **до** первой
+   - Журнал `.raylink\txn.json` = `{id, from, to, gammaIndexSha, startedAt}` пишется (tmp + rename) **до** первой
      операции.
    - Операции идемпотентны: «убрать имя (без смены атрибутов) → положить ссылку/копию из проверенного источника».
    - Занятый файл (`ERROR_SHARING_VIOLATION`, антивирус) — 5 попыток: 0,2/0,5/1/2/4 с.
@@ -493,7 +493,7 @@ UTF-8 без BOM, LF. Пример:
 `appdata` пришлось бы выносить, а junction в корне стенда противоречит правилу «через ссылки-папки не пишем» (§4.2).
 
 ### 3.8 Откат и хранение N сборок
-- В кэше `.quarknet\builds\` лежат N последних проверенных сборок: по умолчанию 3, настройка 2–10. Всегда хранятся
+- В кэше `.raylink\builds\` лежат N последних проверенных сборок: по умолчанию 3, настройка 2–10. Всегда хранятся
   установленная, предыдущая и закреплённая.
   - Лишние удаляются после успешной установки. Паки без ссылок из оставшихся манифестов — тоже.
 - «Откатить на 9» = установка 9 по §3.7.
@@ -516,8 +516,8 @@ UTF-8 без BOM, LF. Пример:
 
 ### 4.1 Раскладка на диске
 ```
-E:\QuarkNET\                         папка стенда (выбирает тестер; NTFS, тот же том, что Anomaly и моды MO2)
-  .quarknet\
+E:\RayLink\                         папка стенда (выбирает тестер; NTFS, тот же том, что Anomaly и моды MO2)
+  .raylink\
     stand.json                       схема, источники (пути Anomaly/MO2/профиль), installedBuild, pinned,
                                      gammaFingerprint, secondInstance, даты
     stand-manifest.json              что положено в game\: rel → [src, size, mtime_ns, mode link|copy, layer]
@@ -528,11 +528,11 @@ E:\QuarkNET\                         папка стенда (выбирает �
     reports\stand-<время>.txt        отчёт сборки стенда (как mo2_stand_report.txt)
   game\                              корень игры = $fs_root$ движка
     bin\  bin_b\  db\  gamedata\  appdata_a\  appdata_b\
-    fsgame.ltx  fsgame_a.ltx  fsgame_b.ltx  quarknet_probe.bin  …
+    fsgame.ltx  fsgame_a.ltx  fsgame_b.ltx  raylink_probe.bin  …
 ```
 Состояние лаунчера вне стенда:
-- `%APPDATA%\QuarkNET Launcher\settings.json` — пути, ник, канал (без ключа), предпочтения;
-- `%LOCALAPPDATA%\QuarkNET Launcher\logs\launcher.log` — ротация 5 × 2 МБ.
+- `%APPDATA%\RayLink Launcher\settings.json` — пути, ник, канал (без ключа), предпочтения;
+- `%LOCALAPPDATA%\RayLink Launcher\logs\launcher.log` — ротация 5 × 2 МБ.
 
 ### 4.2 Правила сборки (перенос `mo2_stand.py`, 29 тестов — в Rust)
 1. **Слои снизу вверх:** игра (без её `appdata\`) → engine → включённые моды → `overwrite` → core → gamma.
@@ -559,7 +559,7 @@ E:\QuarkNET\                         папка стенда (выбирает �
 8. **Сначала все папки, потом удаления, потом раскладка.**
    - Junction/symlink где угодно в стенде останавливает работу до записи первого файла (`REPARSE_IN_STAND`).
    - Удаление — только если `realpath(родитель)` внутри стенда.
-9. **Стенд не пишет:** в непустую папку без `.quarknet\stand.json` (`STAND_FOREIGN`); в папку, которая пересекается
+9. **Стенд не пишет:** в непустую папку без `.raylink\stand.json` (`STAND_FOREIGN`); в папку, которая пересекается
    с Anomaly, MO2, модами или `overwrite` (`STAND_OVERLAP`); через границу тома (`CROSS_VOLUME`). Тихой копии
    70 ГБ нет; копия слоя игры с другого тома — только с явного согласия и расчётом места (§12).
 10. **Метаданные источника** — только `fs::metadata(path)`: он открывает файл и читает MFT.
@@ -577,7 +577,7 @@ E:\QuarkNET\                         папка стенда (выбирает �
 1. **Проверки:**
    - NTFS: `GetVolumeInformationW`;
    - стенд на одном томе с Anomaly и с папкой модов MO2 (серийный номер тома);
-   - пробная ссылка: создать файл в `.quarknet\probe`, связать, сверить FileIndex, удалить;
+   - пробная ссылка: создать файл в `.raylink\probe`, связать, сверить FileIndex, удалить;
    - свободно ≥ нужно: копии ~150 МБ + наш слой ~30 МБ + кэш сборок ~50 МБ + запас 2 ГБ под кеш шейдеров
      и сохранения;
    - процессор с AVX (`is_x86_feature_detected!("avx")`);
@@ -640,7 +640,7 @@ E:\QuarkNET\                         папка стенда (выбирает �
 **Решение — Rust.** Риск расхождения закрывается так:
 - все 29 тестов `tests/tools/test_mo2_stand.py` переносятся как Rust-тесты;
 - дифференциальная проверка (T12): оба инструмента собирают стенд из `E:\GAMMA` в соседние папки, наборы
-  `(rel, src, mode)` сравниваются. Ожидание — 0 отличий, кроме задокументированных: файлы игрока, `.quarknet`.
+  `(rel, src, mode)` сравниваются. Ожидание — 0 отличий, кроме задокументированных: файлы игрока, `.raylink`.
 
 Из PowerShell-инструментов берём **логику, а не вызов**: аргументы `launch.ps1`, `fsgame_*`/`user.ltx` из
 `deploy.ps1`, состав пакета из `package.ps1`. Публикация остаётся в PowerShell (§7): она работает на машине
@@ -755,7 +755,7 @@ off size поле
 Невалидный запрос — длина ≠ 1200, чужая сигнатура или версия — `intercept` возвращает 0 (дальше в ENet) и не
 отвечает.
 
-**Файл пробы.** Движок читает `$fs_root$\quarknet_probe.bin`; его пишет лаунчер при каждой установке и пересборке.
+**Файл пробы.** Движок читает `$fs_root$\raylink_probe.bin`; его пишет лаунчер при каждой установке и пересборке.
 - Формат: `"QNPF"`, `u8 version = 1`, `u16 summary_len`, summary, остаток = detail. Всего ≤ 64 КиБ, больше — файл
   игнорируется с одной строкой в логе.
 - Движок содержимое **не разбирает**.
@@ -802,7 +802,7 @@ off size поле
 ## 6. Помощь
 
 ### 6.1 «Отправить логи»
-- **Состав архива** `QuarkNET-logs-<ник>-b<N>-<ГГГГММДД-ЧЧММ>-<id>.zip`, где `id` — 4 hex, тот же, что на экране:
+- **Состав архива** `RayLink-logs-<ник>-b<N>-<ГГГГММДД-ЧЧММ>-<id>.zip`, где `id` — 4 hex, тот же, что на экране:
   - `appdata_a\logs\*.log` и `appdata_b\logs\*.log` — по 3 свежих на окно. Строки `coop_status` в логах уже есть:
     лаунчер запускает игру с `-coop_autostatus`;
   - свежий `*.mdmp` на окно, если он моложе последнего запуска и ≤ 64 МБ;
@@ -838,12 +838,12 @@ off size поле
 ```
 powershell -ExecutionPolicy Bypass -File tools\publish.ps1 -Build 11
     [-Notes notes.txt | -Note "+ Группа ждёт всех у перехода — держи F" -Note "! Хост не вылетает …"]
-    [-Prerelease] [-Repo owner/quarknet-builds] [-OutDir temp\publish]
+    [-Prerelease] [-Repo owner/raylink-builds] [-OutDir temp\publish]
     [-Upload [-Yes]] [-Promote 11] [-GhPath gh] [-QnTool <путь к qn-tool.exe>]
 ```
 
 1. **Номер.** `-Build N` обязателен и больше последнего опубликованного: локальная запись
-   `releases\quarknet\build-*\manifest.json`, а при `-Upload` — ещё и `gh release list`. Номер не переиспользуется.
+   `releases\raylink\build-*\manifest.json`, а при `-Upload` — ещё и `gh release list`. Номер не переиспользуется.
 2. **Только закоммиченное.**
    - Проект: `git archive --format=zip HEAD gamedata` (+ `gamedata_gamma`, если есть в HEAD).
    - Движок: `git -C engine archive --format=zip HEAD gamedata`.
@@ -853,7 +853,7 @@ powershell -ExecutionPolicy Bypass -File tools\publish.ps1 -Build 11
 3. **exe.**
    - Берётся `engine-ci\_build\_game\bin_dbg\AnomalyDX11AVX.exe` → `bin/AnomalyCoopDX11AVX.exe`.
    - Новое (задача P1): сборочный скрипт переезжает в `tools\build_ci.sh` (сейчас `temp\build_ci.sh`) и после
-     успешной сборки пишет `engine-ci\_build\_game\bin_dbg\quarknet_build.json`:
+     успешной сборки пишет `engine-ci\_build\_game\bin_dbg\raylink_build.json`:
      `{engineCommit, builtAt, exeSha256, configuration: "DX11-AVX"}`.
    - `publish.ps1` отказывается, если `engineCommit ≠ git -C engine rev-parse HEAD` или sha exe не совпал:
      «exe собран не из HEAD движка — запусти tools\build_ci.sh».
@@ -866,8 +866,8 @@ powershell -ExecutionPolicy Bypass -File tools\publish.ps1 -Build 11
    - 4 детерминированных zip (§3.2), `manifest.json` по §3.3.
    - Проверка — `qn-tool manifest check manifest.json --packs <dir>`, тот же валидатор, что в лаунчере. Нет
      `qn-tool` — базовые проверки на PS и предупреждение.
-   - Подпись (P1, когда появится ключ) — `qn-tool sign`. Ключ — по пути из `QUARKNET_SIGN_KEY`, пароль — из
-     `QUARKNET_SIGN_PASSWORD`. Значения нигде не печатаются.
+   - Подпись (P1, когда появится ключ) — `qn-tool sign`. Ключ — по пути из `RAYLINK_SIGN_KEY`, пароль — из
+     `RAYLINK_SIGN_PASSWORD`. Значения нигде не печатаются.
 7. **Changelog.**
    - `-Notes`/`-Note`: строки `+ ` новое, `! ` исправлено, `~ ` изменено, `? ` известная проблема; ` — ` отделяет
      подсказку.
@@ -881,19 +881,19 @@ powershell -ExecutionPolicy Bypass -File tools\publish.ps1 -Build 11
    - Финальная строка: «Ничего не загружено. Загрузка: -Upload».
 9. **`-Upload` — только по слову владельца.** Агент не передаёт `-Upload` без явного «выкладывай» в чате.
    - `gh auth status`; тег `build-N` не существует.
-   - Подтверждение «Загрузить сборку 11 в owner/quarknet-builds (свежие)? [y/N]» — пропускается только с `-Yes`.
+   - Подтверждение «Загрузить сборку 11 в owner/raylink-builds (свежие)? [y/N]» — пропускается только с `-Yes`.
    - `gh release create build-N <assets> --repo <repo> --title "Сборка N" --notes-file <changelog.md>
      [--prerelease]`.
    - Сверка: `gh release view build-N --json assets` (имена, размеры); `gh release download build-N -p
      manifest.json` и сравнение sha.
-   - Запись `releases\quarknet\build-N\manifest.json`.
+   - Запись `releases\raylink\build-N\manifest.json`.
 10. **`-Promote N`** — `gh release edit build-N --prerelease=false --latest`, с подтверждением.
 11. **Тесты** (pytest, как `tests/tools/test_packaging.py`): пробный прогон в `-OutDir` на текущем репозитории
     (пропуск, если нет exe):
     - структура манифеста;
     - детерминизм — два прогона дают одинаковые sha паков;
     - исключения;
-    - отказ на устаревшем `quarknet_build.json` и на занятом номере;
+    - отказ на устаревшем `raylink_build.json` и на занятом номере;
     - разбор `-Note`;
     - `-Upload` с подставным `-GhPath` (`.cmd`, пишет аргументы в файл) — команда собрана верно, сети нет.
 
@@ -1001,7 +1001,7 @@ powershell -ExecutionPolicy Bypass -File tools\publish.ps1 -Build 11
 - Артефакты: `createUpdaterArtifacts: true`, подпись minisign — ключ §8.3; при сборке он в
   `TAURI_SIGNING_PRIVATE_KEY(_PASSWORD)`.
 - **Эндпоинт** — статический `latest.json` ассетом релиза в публичном репозитории лаунчера:
-  `https://github.com/<owner>/quarknet-launcher/releases/latest/download/latest.json`.
+  `https://github.com/<owner>/raylink-launcher/releases/latest/download/latest.json`.
   - Если репозиторий будет приватным, нужны заголовки с ключом в запросе updater — проверить по документации плагина
     v2 при реализации (T11). Предпочтение — публичный: секретов в лаунчере нет.
 - **Когда:** при старте и раз в 6 ч. Не во время игры и не во время транзакции стенда.
@@ -1020,7 +1020,7 @@ powershell -ExecutionPolicy Bypass -File tools\publish.ps1 -Build 11
 | `tools/deploy.ps1` | `bin_b` и сверка exe, `fsgame_a/_b` (cp1251, `$app_data_root$`), `appdata_a/_b`, `user.ltx`, отказ смешивать стоковый и GAMMA-стенд | Логика в Rust; копию exe в `<Anomaly>\bin` не берём |
 | `tools/launch.ps1` | Аргументы `-fsltx -smap2048 -coop_host/-coop_connect -coop_nick -coop_autostatus`, cwd = корень игры; «-start последним» | `qn-core::launch::args`, тест против `launch.ps1 -NoStart` |
 | `tools/package.ps1` | Состав нашего слоя (3 части), исключения runtime-файлов, проверки exe (MZ, ≥ 8 МБ, ≥ 60 с), протокол из `coop_protocol.h`, zip с `/` | `publish.ps1` (§7) |
-| `temp/build_ci.sh` | Сборка только закоммиченного (`ci_sync --committed`) DX11-AVX в `engine-ci` | Переезд в `tools/`, штамп `quarknet_build.json` (P1) |
+| `temp/build_ci.sh` | Сборка только закоммиченного (`ci_sync --committed`) DX11-AVX в `engine-ci` | Переезд в `tools/`, штамп `raylink_build.json` (P1) |
 | `coop_protocol.h`, `coop_manager.cpp` | `kProtocolVersion`, `kDefaultPort`, `kMaxPlayers`, `build_id`, `content_fp`, `is_runtime_written` | Проба QNP (§5.6), правило PF (§4.5) |
 | `coop_transport.cpp` + ENet 1.3.18 | `intercept`, потоки keep-alive | E1 |
 

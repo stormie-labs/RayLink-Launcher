@@ -1,11 +1,11 @@
-# QuarkNET Launcher — план реализации v1
+# RayLink Launcher — план реализации v1
 
 К спецификации `docs/SPEC.md`, 2026-10-23 23:50. Ссылки вида «SPEC §3.7» ведут туда.
 
 ## 0. Исходное состояние и правила
 
 **Окружение (проверено 2026-10-23 23:24):**
-- репозиторий `quarknet-launcher` — git, один коммит `7caa29f` (дизайн), без remote;
+- репозиторий `raylink-launcher` — git, один коммит `7caa29f` (дизайн), без remote;
 - Node 24.13, npm; **Rust 1.99.1** (rustup поставлен ведущей в 23:22, `%USERPROFILE%\.cargo\bin` — в уже открытых
   оболочках вызывать полным путём); WebView2 155; Windows SDK 10.0.26100;
 - `gh` 2.101 не залогинен.
@@ -32,7 +32,7 @@
 ## 1. Структура репозитория и владение
 
 ```
-quarknet-launcher/
+raylink-launcher/
   package.json, package-lock.json, tsconfig*.json, vite.config.ts, svelte.config.js,
   vitest.config.ts, playwright.config.ts, eslint.config.js, index.html            T1
   contracts/
@@ -281,7 +281,7 @@ export interface PathsReport {
   ok: boolean; issues: AppError[];
   volumes: { anomaly: string; mo2: string | null; stand: string };
   fileSystem: string; linkProbe: 'ok' | 'failed' | 'skipped';
-  freeBytes: number; needBytes: number; standState: 'empty' | 'quarknet' | 'foreign' | 'missing';
+  freeBytes: number; needBytes: number; standState: 'empty' | 'raylink' | 'foreign' | 'missing';
   modsCount: number | null; missingMods: string[];
 }
 export interface StandSetup { paths: PathsInput; nick: string; secondInstance: boolean }
@@ -475,7 +475,7 @@ pub trait Clock { fn now(&self) -> SystemTime; }
 - **Реализация:**
   - токены DESIGN §4, §5, §8;
   - иконки из `design/shared/icons.js` → `sprite.svg`;
-  - знак «три кварка» по построению DESIGN §10;
+  - знак «три звена» по построению DESIGN §10;
   - фон с ротацией кадров;
   - страница `?gallery` с компонентами для просмотра;
   - шрифты-заглушки Bahnschrift до «ок» на Sofia Sans.
@@ -691,7 +691,7 @@ pub trait Clock { fn now(&self) -> SystemTime; }
   - журнал `tracing` с фильтром из T6.
 - **Проверка:** `cargo test --workspace`; clippy; `npm run tauri dev` вручную:
   - окно, перетаскивание, свернуть и закрыть;
-  - мастер на машине владельца читает `E:\GAMMA` только на чтение, стенд в `E:\QuarkNET-test`.
+  - мастер на машине владельца читает `E:\GAMMA` только на чтение, стенд в `E:\RayLink-test`.
 - **Готово:** все команды §2.1 отвечают по контракту; e2e T3–T5 повторены вручную на настоящем бэкенде (чек-лист).
 
 ### T11 — Самообновление и установщик · B (sonnet) · M
@@ -718,7 +718,7 @@ pub trait Clock { fn now(&self) -> SystemTime; }
 - **Шаги:**
   1. Полные наборы: `npm run check/lint/test/e2e`, `cargo fmt/clippy/test --workspace`.
   2. **Дифференциальная проверка с `mo2_stand.py`.**
-     - Сборка из `E:\GAMMA` в `E:\QuarkNET-diff\py` и `E:\QuarkNET-diff\rs`; ссылки почти не занимают места.
+     - Сборка из `E:\GAMMA` в `E:\RayLink-diff\py` и `E:\RayLink-diff\rs`; ссылки почти не занимают места.
      - Сравнение наборов `(rel, src, mode)`; ожидание — 0 отличий, кроме задокументированных.
      - Удаление — безопасным удалением по манифесту.
   3. **Живой канал** (загрузка только по слову владельца):
@@ -761,7 +761,7 @@ pub trait Clock { fn now(&self) -> SystemTime; }
     пробы;
   - подключение в `coop_transport.cpp`: `m_host->intercept` только у хоста;
   - снимок полей в `coop_session.cpp` / `xrGame/coop/coop_manager.cpp`: `protocol`, `build_id`, `content_fp`,
-    `entries`, ник, игроки, `max`, фаза, путь `$fs_root$\quarknet_probe.bin`;
+    `entries`, ник, игроки, `max`, фаза, путь `$fs_root$\raylink_probe.bin`;
   - тесты в `anomaly-coop/tests/` (+ `tests/data/probe_vectors.json` — копия из лаунчера).
 - **Сначала тесты** (`coop_tests.exe`):
   1. векторы: разбор запроса, сборка ответа, байт в байт;
@@ -781,9 +781,9 @@ pub trait Clock { fn now(&self) -> SystemTime; }
 ### P1 — `anomaly-coop`: `tools\publish.ps1` и штамп сборки · B (sonnet) · M
 - **Файлы:**
   - `tools/publish.ps1`;
-  - `tools/build_ci.sh` — перенос из `temp/build_ci.sh`; пишет `engine-ci\_build\_game\bin_dbg\quarknet_build.json`;
+  - `tools/build_ci.sh` — перенос из `temp/build_ci.sh`; пишет `engine-ci\_build\_game\bin_dbg\raylink_build.json`;
   - `tests/tools/test_publish.py`;
-  - `releases/quarknet/` — локальные записи, в `.gitignore` по решению ведущей.
+  - `releases/raylink/` — локальные записи, в `.gitignore` по решению ведущей.
 - **Сначала тесты** (pytest, PowerShell как подпроцесс):
   1. пробный прогон в `-OutDir temp\pub_test` → манифест по SPEC §3.3; пути проходят `contracts/fixtures/relpaths.json`;
   2. детерминизм — два прогона дают одинаковые sha паков;
@@ -798,7 +798,7 @@ pub trait Clock { fn now(&self) -> SystemTime; }
   загружено».
 
 ### P2 (по желанию, после T12) — `anomaly-coop`
-- `deploy.ps1` пишет `quarknet_probe.bin` на стендах владельца — чтобы «Проверить» узнавала сборку у хоста без
+- `deploy.ps1` пишет `raylink_probe.bin` на стендах владельца — чтобы «Проверить» узнавала сборку у хоста без
   лаунчера.
 - Позже — `deploy.ps1 -Profile` вызывает `qn-stand.exe` вместо `python mo2_stand.py` (SPEC §4.6).
 

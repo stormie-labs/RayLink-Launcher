@@ -1,4 +1,4 @@
-/* QuarkNET Launcher prototypes — shared base.
+/* RayLink Launcher prototypes — shared base.
  * Fonts: prototypes use stand-ins until the OFL files are downloaded (see docs/DESIGN.md § Типографика):
  *   display / UI  -> Bahnschrift (Windows system, DIN 1451 cut) instead of Sofia Sans / Sofia Sans Condensed
  *   data / mono   -> JetBrains Mono (OFL, local copy in ./fonts, one weight 500)

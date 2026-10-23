@@ -1,4 +1,4 @@
-// QuarkNET prototypes: inline SVG sprite (24-unit grid, 1.75 stroke, square caps) + the screenshot state switch.
+// RayLink prototypes: inline SVG sprite (24-unit grid, 1.75 stroke, square caps) + the screenshot state switch.
 // Usage: <svg class="i"><use href="#i-play"/></svg>. ?state=update -> <html class="is-update">.
 (function () {
   const params = new URLSearchParams(location.search);
@@ -7,7 +7,7 @@
   const sym = (id, body, vb = "0 0 24 24") => `<symbol id="${id}" viewBox="${vb}">${body}</symbol>`;
   const sprite =
     '<svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:0;height:0" aria-hidden="true">' +
-    // logo: three quarks bound into one network, laid out like the trefoil (one node down, two up)
+    // logo: three links bound into one network, laid out like the trefoil (one node down, two up)
     sym("qn-mark",
       '<circle cx="16" cy="16" r="10" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".55"/>' +
       '<path d="M16 16V26M16 16L7.34 11M16 16L24.66 11" stroke="currentColor" stroke-width="2.2"/>' +

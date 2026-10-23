@@ -88,7 +88,7 @@ def main() -> None:
         "Шрифты в макетах — заглушки: Bahnschrift (Windows) и JetBrains Mono. В приложении — Sofia Sans,",
         "Sofia Sans Condensed и JetBrains Mono: OFL, полная кириллица, файлы лягут в приложение.",
         "Адрес 203.0.113.24 — документационный, вместо адреса друга. Сборка 11 — пример.",
-        "HTML: quarknet-launcher/design/home-{a,b,c}.html  ·  бриф: docs/DESIGN.md",
+        "HTML: raylink-launcher/design/home-{a,b,c}.html  ·  бриф: docs/DESIGN.md",
     ]
     for i, line in enumerate(notes):
         d.text((x, ny + i * 30), line, font=font(20), fill=DIM if i < 4 else INK)
