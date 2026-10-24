@@ -804,7 +804,7 @@ namespace RayLink
 			return Path.Combine(S.StandRoot, Gamma ? "gamma" : "anomaly");
 		}
 
-		string BuildDir(string tag) { return Path.Combine(Path.Combine(S.StandRoot, "builds"), tag); }
+		string BuildDir(string tag) { return Path.Combine(Path.Combine(Application.StartupPath, "builds"), tag); } // the home
 
 		// ---------------------------------------------------------- the game and its paths (SPEC 2.1)
 		void Startup()
@@ -896,8 +896,17 @@ namespace RayLink
 			}
 			if (string.IsNullOrEmpty(S.StandRoot))
 			{
+				// Owner 2026-10-24: the folder the launcher was installed into is RayLink's home - builds, scripts and the
+				// stand go there. The stand is hard links to the game's files: on another volume than the game it goes to
+				// <game volume>\RayLink (the builds still come into the home).
+				string home = Application.StartupPath;
 				string drive = Path.GetPathRoot(gamma ? Games.ModsDir(S.Mo2Dir) : S.AnomalyDir);
-				S.StandRoot = Path.Combine(drive, "RayLink");
+				if (string.Equals(Path.GetPathRoot(home), drive, StringComparison.OrdinalIgnoreCase)) S.StandRoot = home;
+				else
+				{
+					S.StandRoot = Path.Combine(drive, "RayLink");
+					Log("стенд — на диске игры (" + S.StandRoot + "): жёсткие ссылки работают только в пределах одного диска");
+				}
 				S.Save();
 			}
 			return true;
@@ -965,7 +974,7 @@ namespace RayLink
 				Log("уже установлена");
 				return;
 			}
-			string cache = Path.Combine(S.StandRoot, "cache");
+			string cache = Path.Combine(Application.StartupPath, "cache");
 			Directory.CreateDirectory(cache);
 			string zip = Path.Combine(cache, rel.AssetName);
 			Log("качаю " + rel.AssetName + " …");
