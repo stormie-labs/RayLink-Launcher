@@ -96,7 +96,7 @@ namespace RayLink
 						case "profile": s.Profile = v; break;
 						case "stand": s.StandRoot = v; break;
 						case "nick": s.Nick = v; break;
-						case "repo": if (v.Length > 0) s.Repo = v; break;
+						case "repo": if (v.Length > 0 && v != "stormie-labs/RayLink-Engine") s.Repo = v; break; // builds moved to RayLink-Coop
 						case "address": s.Address = v; break;
 						case "installed": s.Installed = v; break;
 						case "token": s.TokenProtected = v; break;
