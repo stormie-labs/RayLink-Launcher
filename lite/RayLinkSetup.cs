@@ -14,15 +14,15 @@ using Microsoft.Win32;
 
 [assembly: AssemblyTitle("RayLink Setup")]
 [assembly: AssemblyProduct("RayLink")]
-[assembly: AssemblyVersion("0.1.0.0")]
-[assembly: AssemblyFileVersion("0.1.0.0")]
+[assembly: AssemblyVersion("0.1.1.0")]
+[assembly: AssemblyFileVersion("0.1.1.0")]
 [assembly: System.Runtime.Versioning.TargetFramework(".NETFramework,Version=v4.8", FrameworkDisplayName = ".NET Framework 4.8")]
 
 namespace RayLink
 {
 	static class Setup
 	{
-		const string Version = "0.1.0";
+		const string Version = "0.1.1";
 		const string Key = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\RayLink";
 		const string Exe = "RayLinkLauncher.exe";
 

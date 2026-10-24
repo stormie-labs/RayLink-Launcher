@@ -26,14 +26,14 @@ using System.Windows.Forms;
 [assembly: System.Runtime.Versioning.TargetFramework(".NETFramework,Version=v4.8", FrameworkDisplayName = ".NET Framework 4.8")]
 [assembly: System.Reflection.AssemblyTitle("RayLink Launcher")]
 [assembly: System.Reflection.AssemblyProduct("RayLink")]
-[assembly: System.Reflection.AssemblyVersion("0.1.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.1.0.0")]
+[assembly: System.Reflection.AssemblyVersion("0.1.1.0")]
+[assembly: System.Reflection.AssemblyFileVersion("0.1.1.0")]
 
 namespace RayLink
 {
 	static class Program
 	{
-		public const string Version = "0.1.0";
+		public const string Version = "0.1.1";
 		public const string DefaultRepo = "REPLACE_OWNER/RayLink"; // set by build.cmd (/define is not enough for strings)
 		public const string ExeName = "AnomalyCoopDX11AVX.exe";
 
@@ -365,11 +365,31 @@ namespace RayLink
 		static void Unlink(string path)
 		{
 			try { File.Delete(path); }
-			catch (UnauthorizedAccessException)
+			catch (UnauthorizedAccessException e)
 			{
-				if ((File.GetAttributes(path) & FileAttributes.ReadOnly) == 0) throw;
+				if ((File.GetAttributes(path) & FileAttributes.ReadOnly) == 0)
+					throw new IOException("нет доступа к " + path + ": файл занят — игра (или её второе окно, или окно вылета) " +
+						"ещё запущена из стенда? (" + e.Message + ")");
 				Native.DeleteIgnoringReadonly(path);
 			}
+		}
+
+		// Processes started from inside the stand (the game, its second window, a crash window that keeps it alive): Windows
+		// refuses to delete a running exe ("access denied"), so the stand cannot be rebuilt under them. Live 2026-10-24: the
+		// owner's laptop failed the build 16 -> 17 update with "access denied".
+		public static string RunningFrom(string dir)
+		{
+			List<string> found = new List<string>();
+			foreach (Process p in Process.GetProcesses())
+			{
+				try
+				{
+					if (Inside(p.MainModule.FileName, dir)) found.Add(p.ProcessName + " (PID " + p.Id + ")");
+				}
+				catch (Exception) { } // system and other users' processes: no access, and not ours
+				finally { p.Dispose(); }
+			}
+			return string.Join(", ", found.ToArray());
 		}
 
 		static void Place(string src, string dst, bool copy)
@@ -1033,6 +1053,9 @@ namespace RayLink
 				gl.Name = "<RayLink GAMMA>"; gl.Root = gammaData; gl.Prefix = "gamedata"; gl.Copy = true; gl.Kind = "ours";
 				layers.Add(gl);
 			}
+			string holders = Directory.Exists(sd) ? Stand.RunningFrom(sd) : "";
+			if (holders.Length > 0)
+				throw new IOException("из стенда запущено: " + holders + ". Закрой игру (и второе окно), потом собирай стенд");
 			Log("собираю стенд " + sd + " (" + (Gamma ? "G.A.M.M.A, профиль " + S.Profile : "Anomaly") + ", сборка " + S.Installed + ") …");
 			Stand st = new Stand(Log);
 			st.Materialize(layers, sd);
