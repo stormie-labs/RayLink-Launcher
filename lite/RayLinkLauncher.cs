@@ -698,19 +698,10 @@ namespace RayLink
 			Controls.Add(Lbl("Ник", 40, 322, 10f, FontStyle.Regular, Dim));
 			Place(tbNick, 40, 344, 200, 26);
 			StyleInput(tbNick);
-			rbHost.Text = "Создать игру";
-			rbJoin.Text = "Подключиться";
-			Place(rbHost, 40, 388, 150, 26);
-			Place(rbJoin, 200, 388, 150, 26);
-			rbHost.ForeColor = rbJoin.ForeColor = Fg;
-			Controls.Add(Lbl("Адрес хоста (ip или ip:порт)", 40, 420, 10f, FontStyle.Regular, Dim));
-			Place(tbAddress, 40, 442, 300, 26);
-			StyleInput(tbAddress);
-			chkSecond.Text = "Второе окно на этом ПК (проверка в одиночку)";
-			chkSecond.ForeColor = Dim;
-			Place(chkSecond, 40, 480, 420, 26);
+			// Owner 2026-10-24: a launcher for every player - hosting and joining are in the game's own Co-op window.
+			Controls.Add(Lbl("Создать игру или подключиться — в игре, окно «Кооператив»", 40, 384, 9.5f, FontStyle.Regular, Dim));
 
-			Btn(btnPlay, "ИГРАТЬ", 40, 520, 300, 72, true);
+			Btn(btnPlay, "ИГРАТЬ", 40, 420, 300, 72, true);
 
 			Controls.Add(Lbl("Что происходит", 500, 92, 10f, FontStyle.Bold, Dim));
 			tbLog.Multiline = true;
@@ -1043,15 +1034,7 @@ namespace RayLink
 		{
 			S.Nick = CleanNick(tbNick.Text);
 			tbNick.Text = S.Nick;
-			S.Address = tbAddress.Text.Trim();
-			S.Join = rbJoin.Checked;
-			S.SecondWindow = chkSecond.Checked;
 			S.Save();
-			if (S.Join && S.Address.Length == 0)
-			{
-				MessageBox.Show(this, "Впиши адрес хоста (ip или ip:порт).", "RayLink", MessageBoxButtons.OK, MessageBoxIcon.Information);
-				return;
-			}
 			string sd = StandDir();
 			bool ready = File.Exists(Path.Combine(sd, Stand.Manifest)) && File.Exists(Path.Combine(Path.Combine(sd, "bin"), Program.ExeName));
 			Run("запуск", delegate
@@ -1059,8 +1042,7 @@ namespace RayLink
 				if (!ready) BuildStand();
 				if (Process.GetProcessesByName(Path.GetFileNameWithoutExtension(Program.ExeName)).Length > 0)
 					Log("! игра уже запущена — второй раз из той же папки движок не стартует");
-				Start("a", S.Join ? "-coop_connect " + S.Address : "-coop_host 27960");
-				if (S.SecondWindow) Start("b", "-coop_connect 127.0.0.1");
+				Start("a", "");
 			});
 		}
 
@@ -1070,7 +1052,7 @@ namespace RayLink
 			string exe = Path.Combine(Path.Combine(sd, inst == "a" ? "bin" : "bin_b"), Program.ExeName);
 			if (!File.Exists(exe)) throw new IOException("нет " + exe + " — собери стенд");
 			string nick = inst == "a" ? S.Nick : S.Nick + "_2";
-			string args = "-fsltx fsgame_" + inst + ".ltx -smap2048 -coop_nick " + nick + " " + coop;
+			string args = ("-fsltx fsgame_" + inst + ".ltx -smap2048 -coop_nick " + nick + " " + coop).Trim();
 			ProcessStartInfo psi = new ProcessStartInfo(exe, args);
 			psi.WorkingDirectory = sd;
 			psi.UseShellExecute = false;

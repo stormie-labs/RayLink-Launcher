@@ -7,7 +7,7 @@ set "CSC=%WINDIR%\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
 if not exist "%CSC%" set "CSC=%WINDIR%\Microsoft.NET\Framework\v4.0.30319\csc.exe"
 if not exist "%CSC%" (echo csc.exe of .NET Framework 4 not found & exit /b 2)
 set "REPO=%~1"
-if "%REPO%"=="" set "REPO=REPLACE_OWNER/RayLink"
+if "%REPO%"=="" set "REPO=stormie-labs/RayLink-Engine"
 if not exist "%HERE%out" mkdir "%HERE%out"
 powershell -NoProfile -Command "(Get-Content -Raw -Encoding UTF8 '%HERE%RayLinkLauncher.cs') -replace 'REPLACE_OWNER/RayLink', '%REPO%' | Set-Content -Encoding UTF8 '%HERE%out\RayLinkLauncher.gen.cs'"
 set "ICON="
