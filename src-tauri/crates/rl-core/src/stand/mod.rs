@@ -1,4 +1,5 @@
 //! Native, journaled stand materialization.
+mod apply;
 use crate::{
     dto::{Settings, StandSummary},
     gamma,
@@ -55,6 +56,23 @@ struct Layer {
     copy: bool,
     game: bool,
     is_mod: bool,
+}
+
+fn require_link_volumes(
+    layers: &[Layer],
+    root: &Path,
+    mut same_volume: impl FnMut(&Path, &Path) -> Result<bool, String>,
+) -> Result<(), String> {
+    for layer in layers.iter().filter(|layer| !layer.copy) {
+        if !same_volume(&layer.root, root)? {
+            return Err(format!(
+                "STAND_VOLUME_MISMATCH: Game/mod source {} and stand {} are on different volumes. Choose a stand folder on the game/mod volume; a full game copy was not started.",
+                layer.root.display(),
+                root.display()
+            ));
+        }
+    }
+    Ok(())
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -136,6 +154,7 @@ pub fn stand_path(settings: &Settings, home: &Path) -> PathBuf {
 /// Full acceptance check for launch: all sources, manifest entries and critical content hashes.
 pub fn verify_ready(settings: &Settings, home: &Path) -> bool {
     fn ready(settings: &Settings, home: &Path) -> Result<bool, String> {
+        let mut files = rl_fs::Batch::new();
         let root = rl_fs::absolute(&stand_path(settings, home))?;
         rl_fs::guard(&root)?;
         if root.join(JOURNAL).exists()
@@ -156,6 +175,7 @@ pub fn verify_ready(settings: &Settings, home: &Path) -> bool {
             home,
             &AtomicBool::new(false),
             &|_| {},
+            &mut files,
         )?;
         if state.fingerprint != plan.fingerprint {
             return Ok(false);
@@ -165,7 +185,7 @@ pub fn verify_ready(settings: &Settings, home: &Path) -> bool {
             return Ok(false);
         }
         for entry in recorded.values() {
-            let target = rl_fs::join(&root, &entry.rel)?;
+            let target = files.join(&root, &entry.rel)?;
             if !target.is_file() {
                 return Ok(false);
             }
@@ -198,7 +218,8 @@ pub fn materialize(
         0,
         true,
     );
-    let plan = plan(settings, build, home, cancel, progress)?;
+    let mut files = rl_fs::Batch::new();
+    let plan = plan(settings, build, home, cancel, progress, &mut files)?;
     let root = &plan.root;
     let processes = running_processes(root)?;
     if !processes.is_empty() {
@@ -207,7 +228,7 @@ pub fn materialize(
             processes.join(", ")
         ));
     }
-    rl_fs::create_dir_all(root)?;
+    files.create_dir_all(root)?;
     let _lock = StandLock::acquire(root)?;
     let old = load(root, MANIFEST)?;
     let pending = load(root, JOURNAL)?;
@@ -240,18 +261,25 @@ pub fn materialize(
         }
     }
     // Check ALL old and new destinations before any mutation, including paths only removed by this update.
-    for entry in owned.values().chain(plan.entries.values()) {
-        let dst = rl_fs::join(root, &entry.rel)?;
+    let mut intended = owned.clone();
+    intended.extend(plan.entries.clone());
+    let destinations: BTreeMap<_, _> = owned
+        .values()
+        .chain(plan.entries.values())
+        .map(|entry| (entry.rel.as_str(), entry))
+        .collect();
+    for entry in destinations.values() {
+        let dst = files.join(root, &entry.rel)?;
         if dst.exists() && !dst.is_file() {
             return Err(format!(
                 "A directory occupies a managed file path: {}",
                 dst.display()
             ));
         }
-    }
-    for (key, entry) in &plan.entries {
-        let dst = rl_fs::join(root, &entry.rel)?;
-        if dst.exists() && !owned.contains_key(key) {
+        if plan.entries.contains_key(&entry.rel.to_lowercase())
+            && dst.exists()
+            && !owned.contains_key(&entry.rel.to_lowercase())
+        {
             return Err(format!(
                 "Refusing to replace an unmanaged file: {}",
                 dst.display()
@@ -259,12 +287,10 @@ pub fn materialize(
         }
     }
     for seed in plan.seeds.values() {
-        rl_fs::join(root, &seed.rel)?;
+        files.join(root, &seed.rel)?;
     }
-    rl_fs::join(root, "appdata_a/user.ltx")?;
+    files.join(root, "appdata_a/user.ltx")?;
     check_cancel(cancel)?;
-    let mut intended = owned.clone();
-    intended.extend(plan.entries.clone());
     save(
         root,
         JOURNAL,
@@ -284,72 +310,46 @@ pub fn materialize(
     for (key, entry) in &owned {
         check_cancel(cancel)?;
         if !plan.entries.contains_key(key) {
-            let target = rl_fs::join(root, &entry.rel)?;
+            let target = files.join(root, &entry.rel)?;
             if target.exists() {
-                rl_fs::remove_file(&target)?;
+                files.remove_file(&target)?;
                 summary.removed += 1;
             }
         }
         current += 1;
     }
-    for (key, entry) in &plan.entries {
+    // Match the legacy builder: create/check each shared parent once before
+    // independent file jobs begin. Every entry was validated in the preflight.
+    let directories: std::collections::BTreeSet<_> = plan
+        .entries
+        .values()
+        .filter_map(|entry| root.join(&entry.rel).parent().map(Path::to_path_buf))
+        .collect();
+    for directory in directories {
         check_cancel(cancel)?;
-        let target = rl_fs::join(root, &entry.rel)?;
-        let unchanged = applied.get(key).is_some_and(|e| e == entry)
-            && target.is_file()
-            && match &entry.hash {
-                Some(hash) => hash_file(&target)? == *hash,
-                None => true,
-            };
-        if unchanged {
-            summary.unchanged += 1;
-        } else {
-            rl_fs::create_dir_all(
-                target
-                    .parent()
-                    .ok_or_else(|| "Managed file has no parent".to_string())?,
-            )?;
-            if let Some(source) = &entry.source {
-                let (linked, fallback) = rl_fs::place(source, &target, entry.copy)?;
-                if linked {
-                    summary.linked += 1;
-                } else {
-                    summary.copied += 1;
-                }
-                if let Some(message) = fallback {
-                    report(
-                        progress,
-                        "stand_copy_fallback",
-                        &message,
-                        current,
-                        total,
-                        true,
-                    );
-                }
-            } else {
-                // The generated config also replaces the name, never writes through a link.
-                rl_fs::remove_file(&target)?;
-                rl_fs::atomic_write(&target, &plan.generated)?;
-                summary.copied += 1;
-            }
-        }
-        current += 1;
-        report(
-            progress,
-            "stand_apply",
-            &format!("Installing {}", entry.rel),
-            current,
-            total,
-            true,
-        );
+        files.create_dir_all(&directory)?;
     }
+    let placed = apply::run(
+        &plan.entries,
+        &applied,
+        root,
+        &plan.generated,
+        cancel,
+        progress,
+        current,
+        total,
+    )?;
+    summary.linked += placed.linked;
+    summary.copied += placed.copied;
+    summary.unchanged += placed.unchanged;
+    current += plan.entries.len() as u64;
     for seed in plan.seeds.values() {
         check_cancel(cancel)?;
-        let target = rl_fs::join(root, &seed.rel)?;
+        let target = files.join(root, &seed.rel)?;
         if !target.exists()
             && let Some(source) = &seed.source
         {
-            rl_fs::place(source, &target, true)?;
+            files.place(source, &target, true)?;
             summary.copied += 1;
         }
         current += 1;
@@ -363,13 +363,13 @@ pub fn materialize(
         );
     }
     check_cancel(cancel)?;
-    let user = rl_fs::join(root, "appdata_a/user.ltx")?;
-    rl_fs::create_dir_all(
+    let user = files.join(root, "appdata_a/user.ltx")?;
+    files.create_dir_all(
         user.parent()
             .ok_or_else(|| "User config has no parent".to_string())?,
     )?;
     if !user.exists() {
-        rl_fs::atomic_write(&user, &plan.user)?;
+        files.atomic_write(&user, &plan.user)?;
         summary.copied += 1;
     }
     // Reject a source changed during installation rather than recording a mixed stand as ready.
@@ -382,7 +382,7 @@ pub fn materialize(
         total,
         true,
     );
-    let after = plan_fingerprint(settings, &plan, home, cancel)?;
+    let after = plan_fingerprint(settings, &plan, home, cancel, &mut files)?;
     if after != plan.fingerprint {
         return Err("A source changed while assembling the stand. Close MO2 updates and retry; saves were preserved.".into());
     }
@@ -572,7 +572,11 @@ fn managed_relative(rel: &str) -> Result<(), String> {
     }
     Ok(())
 }
-fn layers(settings: &Settings, build: &Path, progress: Option<&Reporter>) -> Result<(Vec<Layer>, String), String> {
+fn layers(
+    settings: &Settings,
+    build: &Path,
+    progress: Option<&Reporter>,
+) -> Result<(Vec<Layer>, String), String> {
     gamma::validate_anomaly(Path::new(&settings.anomaly_dir))?;
     let mut layers = vec![
         Layer {
@@ -614,10 +618,27 @@ fn layers(settings: &Settings, build: &Path, progress: Option<&Reporter>) -> Res
         for name in mods {
             let path = rl_fs::join(&mods_root, &name)?;
             if !path.exists() {
-                if let Some(progress) = progress { report(progress, "stand_missing_mod", &format!("Enabled MO2 mod folder was not found and was skipped: {name} ({})", path.display()), 0, 0, true); }
+                if let Some(progress) = progress {
+                    report(
+                        progress,
+                        "stand_missing_mod",
+                        &format!(
+                            "Enabled MO2 mod folder was not found and was skipped: {name} ({})",
+                            path.display()
+                        ),
+                        0,
+                        0,
+                        true,
+                    );
+                }
                 continue;
             }
-            if !path.is_dir() { return Err(format!("Enabled MO2 mod path is not a directory: {}", path.display())); }
+            if !path.is_dir() {
+                return Err(format!(
+                    "Enabled MO2 mod path is not a directory: {}",
+                    path.display()
+                ));
+            }
             layers.push(Layer {
                 root: path,
                 prefix: "",
@@ -662,8 +683,9 @@ fn scan(
     want: &mut BTreeMap<String, Entry>,
     seeds: &mut BTreeMap<String, Entry>,
     cancel: &AtomicBool,
+    files: &mut rl_fs::Batch,
 ) -> Result<(), String> {
-    rl_fs::guard(&layer.root)?;
+    files.guard(&layer.root)?;
     if !layer.root.is_dir() {
         return Err(format!(
             "Required layer directory is missing: {}",
@@ -695,15 +717,13 @@ fn scan(
                 continue;
             }
             let path = item.path();
-            rl_fs::guard(&path)?;
+            let metadata = files.metadata(&path)?;
             let inner = if prefix.is_empty() {
                 name
             } else {
                 format!("{prefix}/{name}")
             };
             rl_fs::validate_relative(&inner)?;
-            let metadata = fs::metadata(&path)
-                .map_err(|e| format!("Cannot inspect {}: {e}", path.display()))?;
             if metadata.is_dir() {
                 stack.push((path, inner));
                 continue;
@@ -763,6 +783,7 @@ fn plan(
     home: &Path,
     cancel: &AtomicBool,
     progress: &Reporter,
+    files: &mut rl_fs::Batch,
 ) -> Result<Plan, String> {
     if !matches!(settings.game.as_str(), "gamma" | "anomaly") {
         return Err("Unsupported game; expected gamma or anomaly".into());
@@ -798,6 +819,7 @@ fn plan(
             ));
         }
     }
+    require_link_volumes(&layers, &root, rl_fs::same_volume)?;
     let mut want = BTreeMap::new();
     let mut seeds = BTreeMap::new();
     for (index, layer) in layers.iter().enumerate() {
@@ -810,7 +832,7 @@ fn plan(
             layers.len() as u64,
             true,
         );
-        scan(layer, &mut want, &mut seeds, cancel)?;
+        scan(layer, &mut want, &mut seeds, cancel, files)?;
     }
     if !want.contains_key(&EXE.to_lowercase()) {
         return Err(format!("Build is missing {EXE}"));
@@ -877,8 +899,9 @@ fn plan_fingerprint(
     existing: &Plan,
     home: &Path,
     cancel: &AtomicBool,
+    files: &mut rl_fs::Batch,
 ) -> Result<String, String> {
-    Ok(plan(settings, &existing.build, home, cancel, &|_| {})?.fingerprint)
+    Ok(plan(settings, &existing.build, home, cancel, &|_| {}, files)?.fingerprint)
 }
 fn instance_config(bytes: &[u8]) -> Result<Vec<u8>, String> {
     let text = encoding_rs::WINDOWS_1251.decode(bytes).0;
@@ -1027,6 +1050,24 @@ impl Drop for StandLock {
 mod tests {
     use super::*;
     use std::sync::atomic::Ordering;
+    #[test]
+    fn stand_volume_mismatch_is_rejected_before_output_creation() {
+        let (fixture, settings, build, home) = fixture();
+        let (layers, _) = layers(&settings, &build, None).unwrap();
+        let root = fixture.path().join("stand-on-another-volume");
+        let error = require_link_volumes(&layers, &root, |_, _| Ok(false)).unwrap_err();
+        assert!(error.starts_with("STAND_VOLUME_MISMATCH:"));
+        assert!(!root.exists());
+        assert!(!stand_path(&settings, &home).exists());
+        let copy_only = layers
+            .into_iter()
+            .filter(|layer| layer.copy)
+            .collect::<Vec<_>>();
+        require_link_volumes(&copy_only, &root, |_, _| {
+            panic!("Explicit engine/core copies may cross volumes")
+        })
+        .unwrap();
+    }
     fn fixture() -> (tempfile::TempDir, Settings, PathBuf, PathBuf) {
         let t = tempfile::tempdir_in(
             fs::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../temp")).unwrap(),
@@ -1166,6 +1207,41 @@ mod tests {
         );
     }
     #[test]
+    #[cfg(windows)]
+    fn stand_pins_source_and_output_only_during_the_filesystem_pass() {
+        let (fixture, settings, build, home) = fixture();
+        let source = Path::new(&settings.anomaly_dir).join("gamedata/scripts");
+        let root = stand_path(&settings, &home);
+        let moved_source = fixture.path().join("moved-source");
+        let moved_root = fixture.path().join("moved-output");
+        let checked = AtomicBool::new(false);
+        materialize(
+            &settings,
+            &build,
+            &home,
+            &AtomicBool::new(false),
+            &|progress| {
+                if progress.phase == "stand_apply" && !checked.swap(true, Ordering::Relaxed) {
+                    assert!(
+                        fs::rename(&source, &moved_source).is_err(),
+                        "A cached source parent must stay pinned"
+                    );
+                    assert!(
+                        fs::rename(&root, &moved_root).is_err(),
+                        "A cached output parent must stay pinned"
+                    );
+                }
+            },
+        )
+        .unwrap();
+        assert!(checked.load(Ordering::Relaxed));
+        fs::rename(&source, &moved_source).unwrap();
+        fs::rename(&moved_source, &source).unwrap();
+        fs::rename(&root, &moved_root).unwrap();
+        fs::rename(&moved_root, &root).unwrap();
+        assert!(verify_ready(&settings, &home));
+    }
+    #[test]
     fn stand_missing_mod_is_reported_and_skipped_like_mo2() {
         let (_t, s, b, h) = fixture();
         put(
@@ -1175,8 +1251,11 @@ mod tests {
         );
         let warned = std::sync::atomic::AtomicBool::new(false);
         materialize(&s, &b, &h, &AtomicBool::new(false), &|p| {
-            if p.phase == "stand_missing_mod" && p.message.contains("missing") { warned.store(true, std::sync::atomic::Ordering::Relaxed); }
-        }).unwrap();
+            if p.phase == "stand_missing_mod" && p.message.contains("missing") {
+                warned.store(true, std::sync::atomic::Ordering::Relaxed);
+            }
+        })
+        .unwrap();
         assert!(warned.load(std::sync::atomic::Ordering::Relaxed));
         assert!(stand_path(&s, &h).join(EXE).is_file());
         assert!(verify_ready(&s, &h));

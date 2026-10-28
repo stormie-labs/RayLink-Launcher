@@ -12,3 +12,4 @@ export function progressPercent(value: { current: number; total: number }): numb
   return Math.max(0, Math.min(100, value.current / value.total * 100));
 }
 export function safeLocale(value: string): Language { return value === 'ru' ? 'ru' : 'en'; }
+export function isStandVolumeMismatch(message: string): boolean { return message.startsWith('STAND_VOLUME_MISMATCH:'); }

@@ -1,6 +1,6 @@
 [package]
 name = "rl-core"
-version = "0.2.2"
+version = "0.2.3"
 description = "RayLink: launcher logic without Tauri (manifest, channel, stand, GAMMA, install, host probe, launch args)"
 edition.workspace = true
 rust-version.workspace = true

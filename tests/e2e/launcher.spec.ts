@@ -1,4 +1,26 @@
 import { test, expect } from '@playwright/test';
+import { defaultSettings, type Snapshot } from '../../src/contract';
+
+test('a cross-volume stand offers a clear drive correction before retry', async ({ page }) => {
+  const fixture: Snapshot = { settings: { ...defaultSettings, game: 'anomaly', language: 'ru', anomalyDir: 'E:\\Anomaly' }, homeDir: 'C:\\RayLink', settingsPath: 'AppData/RayLink/settings.json', profiles: [], gammaVersion: '', standPath: 'C:\\RayLink\\anomaly', standReady: false, running: false, release: null, launcherVersion: '0.2.3', installer: false, uninstaller: false, installedApp: true };
+  await page.route('**/src/api.ts*', route => route.fulfill({ contentType: 'application/javascript', body: `
+    export const native = false, preview = true;
+    export async function snapshot() { return ${JSON.stringify(fixture)}; }
+    export async function command() { throw new Error('STAND_VOLUME_MISMATCH: source E and target C'); }
+    export async function onProgress() { return () => {}; }
+    export async function chooseFolder() { return null; }
+    export async function windowAction() {}
+    export async function changeInstallerLanguage() {}
+  ` }));
+  await page.goto('/?preview=launcher');
+  await page.getByRole('button', { name: 'Подготовить игру', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Выбери диск с игрой');
+  await expect(page.getByRole('alert')).toContainText('Полное копирование игры не начиналось');
+  await page.screenshot({ path: 'temp/ui/stand-volume-mismatch.png' });
+  await page.getByRole('button', { name: 'Выбрать папку стенда', exact: true }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(page.locator('input[name="standRoot"]')).toBeFocused();
+});
 test('launcher matches the selected image-led layout and settings are keyboard accessible', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', reason => errors.push(reason.message));

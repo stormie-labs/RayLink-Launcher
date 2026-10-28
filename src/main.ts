@@ -3,7 +3,7 @@ import './style.css';
 import { command, snapshot, onProgress, chooseFolder, windowAction, native, preview, changeInstallerLanguage } from './api';
 import { translate, type MessageKey } from './i18n';
 import { defaultSettings, type Snapshot, type Settings, type Progress, type LauncherUpdate, type Release } from './contract';
-import { primaryAction, progressPercent } from './state';
+import { primaryAction, progressPercent, isStandVolumeMismatch } from './state';
 
 const root = document.querySelector<HTMLDivElement>('#app');
 if (!root) throw new Error('Application root is missing');
@@ -104,7 +104,8 @@ function render(): void {
 function renderNotifications(): void {
   const slot = document.querySelector('#notification-slot');
   if (!slot) return;
-  slot.innerHTML = `${toast ? `<div class="toast" role="status">${icons.check}<span>${e(toast)}</span></div>` : ''}${error ? `<div class="error-card" role="alert"><div><strong>${t('operationFailed')}</strong><button data-action="clear-error" class="icon-button" aria-label="${t('close')}">${icons.close}</button></div><p>${t('retryHint')}</p><details><summary>${t('details')}</summary><pre>${e(error)}</pre></details></div>` : ''}${pendingUpdate && !busy ? `<div class="update-notice"><strong>${t('launcherAvailable')} ${e(pendingUpdate.version)}</strong><button class="primary" data-action="apply-update">${t('restart')}</button><button class="text-button" data-action="later-update">${t('later')}</button></div>` : ''}`;
+  const volumeMismatch = isStandVolumeMismatch(error);
+  slot.innerHTML = `${toast ? `<div class="toast" role="status">${icons.check}<span>${e(toast)}</span></div>` : ''}${error ? `<div class="error-card" role="alert"><div><strong>${t(volumeMismatch ? 'standVolumeTitle' : 'operationFailed')}</strong><button data-action="clear-error" class="icon-button" aria-label="${t('close')}">${icons.close}</button></div><p>${t(volumeMismatch ? 'standVolumeHint' : 'retryHint')}</p>${volumeMismatch ? `<button class="secondary" data-action="stand-location">${t('standVolumeChoose')}</button>` : ''}<details><summary>${t('details')}</summary><pre>${e(error)}</pre></details></div>` : ''}${pendingUpdate && !busy ? `<div class="update-notice"><strong>${t('launcherAvailable')} ${e(pendingUpdate.version)}</strong><button class="primary" data-action="apply-update">${t('restart')}</button><button class="text-button" data-action="later-update">${t('later')}</button></div>` : ''}`;
 }
 async function refresh(): Promise<void> { state = await snapshot(); }
 async function operate(work: () => Promise<void>): Promise<void> {
@@ -179,6 +180,7 @@ async function handleClick(element: HTMLElement): Promise<void> {
     case 'minimize': await windowAction('minimize'); break;
     case 'dismiss': dismiss(); break;
     case 'clear-error': error = ''; renderNotifications(); break;
+    case 'stand-location': error = ''; await openPanel('settings'); app.querySelector<HTMLInputElement>('[name="standRoot"]')?.focus(); break;
     case 'check': await checkRelease(); break;
     case 'primary': {
       const action = primaryAction(state, busy);

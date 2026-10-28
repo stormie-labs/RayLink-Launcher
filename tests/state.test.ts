@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { primaryAction, progressPercent, safeLocale } from '../src/state';
+import { primaryAction, progressPercent, safeLocale, isStandVolumeMismatch } from '../src/state';
 import { defaultSettings, type Snapshot } from '../src/contract';
 const snapshot: Snapshot = { settings: { ...defaultSettings }, homeDir: 'D:/RayLink', profiles: [], gammaVersion: '', standPath: '', standReady: false, running: false, release: null, launcherVersion: '0.2.0', installer: false, uninstaller: false, installedApp: true, settingsPath: 'AppData/RayLink/settings.json' };
+it('offers the drive correction only for the structured stand volume error', () => {
+  expect(isStandVolumeMismatch('STAND_VOLUME_MISMATCH: source E and target C')).toBe(true);
+  expect(isStandVolumeMismatch('Cannot copy an unrelated file')).toBe(false);
+});
 describe('primary action is driven by real installation state', () => {
   it('asks for paths before touching downloads', () => expect(primaryAction(snapshot, false)).toBe('setup'));
   it('builds a configured but unprepared stand', () => expect(primaryAction({ ...snapshot, settings: { ...snapshot.settings, anomalyDir: 'D:/Anomaly', mo2Dir: 'D:/GAMMA', profile: 'G.A.M.M.A' } }, false)).toBe('prepare'));

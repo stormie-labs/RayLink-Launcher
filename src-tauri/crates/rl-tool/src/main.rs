@@ -24,7 +24,16 @@ fn parse(args: Vec<String>) -> Result<Command, ()> {
 fn run(cmd: Command) -> Result<serde_json::Value, String> {
     let cancel = AtomicBool::new(false);
     // Do not emit arbitrary messages: they can include paths or user-supplied data.
-    let progress = |p: rl_core::dto::Progress| eprintln!("{}: {}/{}", p.phase, p.current, p.total);
+    // Match the desktop reporter's 20 Hz cap. Per-file diagnostic output can
+    // dominate a stand benchmark when the shell captures stderr line by line.
+    let last = std::sync::Mutex::new((String::new(), std::time::Instant::now()));
+    let progress = |p: rl_core::dto::Progress| {
+        if let Ok(mut state) = last.lock()
+            && (state.0 != p.phase || state.1.elapsed().as_millis() >= 50 || (p.total > 0 && p.current >= p.total)) {
+            eprintln!("{}: {}/{}", p.phase, p.current, p.total);
+            *state = (p.phase, std::time::Instant::now());
+        }
+    };
     match cmd {
         Command::Channel(repo) => serde_json::to_value(channel::latest(&repo)?).map_err(|_| "Cannot serialize release".into()),
         Command::Install(zip, home, tag) => {
