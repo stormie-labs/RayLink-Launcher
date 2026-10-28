@@ -1,37 +1,58 @@
+<p align="right"><strong>English</strong> &nbsp; / &nbsp; <a href="README.ru.md">Русский</a></p>
+
+![RayLink Launcher — Your way into the Zone.](assets/raylink-hero-en.png)
+
 # RayLink Launcher
 
-Windows launcher for RayLink co-op on S.T.A.L.K.E.R. Anomaly and G.A.M.M.A. Rust handles installation, downloads, game files and launching; Tauri hosts the bilingual desktop interface.
+A Windows launcher for **RayLink co-op in S.T.A.L.K.E.R. Anomaly**, with optional **G.A.M.M.A.** support. Choose your game folders, download a co-op build and prepare a separate game installation. Then head into the Zone.
 
-Download **RayLinkSetup.exe** from [Releases](https://github.com/stormie-labs/RayLink-Launcher/releases/latest). Choose English (default) or Russian and an installation folder. That folder holds the launcher, downloaded builds, cache, scripts and prepared games. Use the desktop or Start menu shortcut afterwards.
+**[Download for Windows](https://github.com/stormie-labs/RayLink-Launcher/releases/latest/download/RayLinkSetup.exe)** &nbsp; · &nbsp; [Release notes](https://github.com/stormie-labs/RayLink-Launcher/releases/latest) &nbsp; · &nbsp; [Report a problem](https://github.com/stormie-labs/RayLink-Launcher/issues/new)
 
-The launcher checks its own repository at startup and updates itself through a verified installer. Game builds come from `stormie-labs/RayLink-Coop`. Original Anomaly/GAMMA files are not modified. Saves and settings survive rebuilds, updates and uninstalling the launcher. Files on the same volume are hard linked when safe; files that can change are copied. Choosing another drive can require substantially more disk space.
+Windows 10 / 11 · x64 · English / Русский · Beta
 
-The interface uses the original bunker photograph and the selected image-led layout. Setup, settings and update progress share the same design, with keyboard focus, reduced motion and local fonts. Network sessions are managed inside the game.
+## Your next expedition, in one place
 
-## Development
+![RayLink Launcher in English: G.A.M.M.A. selected, build b24 ready to play.](assets/raylink-launcher-en.png)
 
-Windows 10/11, WebView2, Node24+, Rust1.88+ and the Visual Studio C++ build tools are required.
+RayLink brings game selection, co-op builds, update progress and launch controls into one desktop app. The installer lets you choose a language and installation folder; the launcher checks for its own updates at startup. Hosting and joining multiplayer sessions happen **inside the game**.
 
-```powershell
-npm ci
-npm run dev
-npm run tauri dev
-```
+Your original Anomaly installation and GAMMA mods stay untouched. RayLink prepares its own game files and keeps separate saves for Anomaly and GAMMA. Updates and rebuilds preserve your saves and preferences.
 
-In a development shell, set `CARGO_TARGET_DIR` to this project's `temp/cargo-target` to keep artifacts together. The Vite watcher deliberately ignores `temp` and Rust/build outputs: watching extraction directories can prevent atomic directory renames on Windows.
+## From setup to Play
 
-```powershell
-npm run check
-npm test
-npm run e2e
-cargo test --workspace --manifest-path src-tauri/Cargo.toml
-cargo clippy --workspace --all-targets --manifest-path src-tauri/Cargo.toml -- -D warnings
-npm run build
-./scripts/build-release.ps1
-```
+1. **Install RayLink.** Run [RayLinkSetup.exe](https://github.com/stormie-labs/RayLink-Launcher/releases/latest/download/RayLinkSetup.exe), choose English or Russian, then choose a folder **on the same drive as your games**. This is where RayLink, downloaded builds and cache live.
+2. **Choose your game.** Select Anomaly or GAMMA in the launcher. Point it to your existing **Anomaly 1.5.3** folder. For GAMMA, also choose its Mod Organizer folder and profile.
+3. **Download a co-op build.** Check **Updates** and install the available build. The launcher shows download and preparation progress.
+4. **Prepare and play.** Choose **Prepare game**. When preparation finishes, choose **Play**, then host or join a session from the game.
 
-The release script produces only `releases/v<version>/RayLinkSetup.exe`. Do not publish the raw launcher binary. The same executable runs setup before installation and launcher mode from its owned installation directory. Installation is per-user; no administrator account or GitHub token is required for the public channels.
+You need an existing Anomaly installation; GAMMA is optional and must already be installed if you want to use it. RayLink does not include either game installation. Internet access is needed to download builds and updates.
 
-Core smoke commands are available through `rl-tool`: `channel`, `install`, `verify`, `prepare` and `launch-args`. Tests use temporary fixtures and never need to write to the original games. `--silent-install <absolute-directory> --test-install --language en` exercises setup without shortcuts or registry changes.
+### Keep game files on the same drive
 
-The previous C# launcher remains under `lite/` as the compatibility reference. Older design experiments remain under `design/`; the implemented contract is documented in [NATIVE-LAUNCHER.md](docs/NATIVE-LAUNCHER.md).
+The prepared game folder, Anomaly and enabled GAMMA mods must share a drive for hard links. RayLink links files that are safe to share and copies files that need their own writable version. If the drives differ, the launcher asks you to choose a suitable prepared-game folder in **Settings → Game files** before continuing.
+
+Preparation time depends on your storage, game files and mod profile. RayLink and its co-op builds are **beta software**; compatibility and multiplayer behavior can change between builds. Check the release notes for the build you use.
+
+## Your files stay yours
+
+| What | Where / what happens |
+| :--- | :--- |
+| Launcher, downloaded builds and cache | Your chosen RayLink installation folder |
+| Prepared game files | The RayLink game folder, or the folder selected in Settings |
+| Launcher preferences | `%APPDATA%\RayLink\settings.json` |
+| Uninstall | Removes the launcher and shortcuts; game files, builds and saves remain |
+| “Delete launcher settings” checkbox | Off by default; select it to remove this installation’s launcher preferences too |
+
+Open the uninstaller from **Settings → Uninstall RayLink** or Windows installed apps.
+
+## Help shape the beta
+
+Found a problem? [Open an issue](https://github.com/stormie-labs/RayLink-Launcher/issues/new) with your launcher version, co-op build, game choice and steps to reproduce it. Include the relevant error or a screenshot, and remove personal information from logs before sharing them.
+
+## About RayLink
+
+**RayLink Launcher is proprietary, closed-source software.** This repository's main branch provides product information, downloads and issue tracking. New application versions are distributed as installers; source development is private. See [LICENSE](LICENSE) for terms, [usage terms](TERMS.md) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for third-party notices.
+
+The launcher is a separate project from the open-source [RayLink Engine](https://github.com/stormie-labs/RayLink-Engine) and [RayLink Co-op](https://github.com/stormie-labs/RayLink-Coop). Their source and licenses remain in their respective repositories.
+
+RayLink is an independent community project, unaffiliated with GSC Game World, the Anomaly team or the G.A.M.M.A. team. Referenced names and marks belong to their respective owners.

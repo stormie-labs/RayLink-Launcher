@@ -1,0 +1,23 @@
+name: Bug report / Ошибка
+description: Report a problem with RayLink Launcher / Сообщить об ошибке лаунчера
+title: "[Launcher] "
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Launcher version / Версия лаунчера
+      placeholder: "0.2.3"
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened? / Что произошло?
+      description: Include steps to reproduce and the expected result. / Укажи шаги и ожидаемый результат.
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics / Диагностика
+      description: Attach relevant log excerpts or screenshots. Remove usernames, private paths, addresses and credentials first. / Приложи нужный фрагмент лога или скриншот, убрав личные данные и секреты.
