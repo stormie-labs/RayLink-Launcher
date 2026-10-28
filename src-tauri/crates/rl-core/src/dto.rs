@@ -34,7 +34,7 @@ pub struct Snapshot {
     pub settings: Settings, pub home_dir: String, pub profiles: Vec<String>,
     pub gamma_version: String, pub stand_path: String, pub stand_ready: bool,
     pub running: bool, pub release: Option<Release>, pub launcher_version: String,
-    pub installer: bool, pub installed_app: bool,
+    pub installer: bool, pub uninstaller: bool, pub installed_app: bool, pub settings_path: String,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

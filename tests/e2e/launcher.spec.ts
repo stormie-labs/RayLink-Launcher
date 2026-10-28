@@ -46,3 +46,16 @@ test('OS reduced-motion preference disables expressive motion', async ({ page })
   const duration = await page.locator('.installer-copy').evaluate(element => getComputedStyle(element).animationDuration);
   expect(parseFloat(duration)).toBeLessThan(0.01);
 });
+test('uninstaller keeps preferences by default and exposes the deletion choice in both languages', async ({ page }) => {
+  await page.goto('/?preview=uninstaller');
+  await expect(page.getByRole('heading', { name: 'Leaving the Zone?' })).toBeVisible();
+  const checkbox = page.getByRole('checkbox', { name: /Delete launcher settings/ });
+  await expect(checkbox).not.toBeChecked();
+  await checkbox.check();
+  await expect(checkbox).toBeChecked();
+  await page.screenshot({ path: 'temp/ui/uninstaller-en.png' });
+  await page.goto('/?preview=uninstaller&lang=ru');
+  await expect(page.getByRole('heading', { name: 'Покидаешь Зону?' })).toBeVisible();
+  await expect(page.getByRole('checkbox', { name: /Удалить настройки лаунчера/ })).not.toBeChecked();
+  await page.screenshot({ path: 'temp/ui/uninstaller-ru.png' });
+});

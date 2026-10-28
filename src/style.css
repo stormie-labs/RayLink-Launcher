@@ -188,6 +188,7 @@
   .install-success > span { width: 37px; height: 37px; border: 1px solid #a8c28f50; border-radius: 50%; display: grid; place-items: center; background: #9fc27d15; color: #bedba4; }
   .install-success svg { width: 20px; height: 20px; }
   .install-success code { color: #b3c5a4; overflow-wrap: anywhere; }
+  .uninstall-location { margin-top: 28px; margin-bottom: 24px; max-width: 420px; background: #1d2819b8; }
   .fatal { padding: 80px; color: #e1e7db; }
   .fatal h1 { font-size: 28px; margin-bottom: 30px; }
   .fatal p { user-select: text; line-height: 1.7; }

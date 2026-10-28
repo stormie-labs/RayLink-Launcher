@@ -486,7 +486,7 @@ fn quick_signature(
         return Err("No valid installed game is selected".into());
     }
     rl_fs::guard(build)?;
-    let (layers, mo2) = layers(settings, build)?;
+    let (layers, mo2) = layers(settings, build, None)?;
     let mut dirs = Vec::new();
     for layer in layers {
         if !layer.root.is_dir() || rl_fs::overlaps(root, &layer.root)? {
@@ -572,7 +572,7 @@ fn managed_relative(rel: &str) -> Result<(), String> {
     }
     Ok(())
 }
-fn layers(settings: &Settings, build: &Path) -> Result<(Vec<Layer>, String), String> {
+fn layers(settings: &Settings, build: &Path, progress: Option<&Reporter>) -> Result<(Vec<Layer>, String), String> {
     gamma::validate_anomaly(Path::new(&settings.anomaly_dir))?;
     let mut layers = vec![
         Layer {
@@ -613,12 +613,11 @@ fn layers(settings: &Settings, build: &Path) -> Result<(Vec<Layer>, String), Str
         let mods_root = gamma::folder(mo2, "mod_directory", "mods")?;
         for name in mods {
             let path = rl_fs::join(&mods_root, &name)?;
-            if !path.is_dir() {
-                return Err(format!(
-                    "Enabled MO2 mod is missing: {name} ({})",
-                    path.display()
-                ));
+            if !path.exists() {
+                if let Some(progress) = progress { report(progress, "stand_missing_mod", &format!("Enabled MO2 mod folder was not found and was skipped: {name} ({})", path.display()), 0, 0, true); }
+                continue;
             }
+            if !path.is_dir() { return Err(format!("Enabled MO2 mod path is not a directory: {}", path.display())); }
             layers.push(Layer {
                 root: path,
                 prefix: "",
@@ -782,7 +781,7 @@ fn plan(
             root.display()
         ));
     }
-    let (layers, mo2_signature) = layers(settings, &build)?;
+    let (layers, mo2_signature) = layers(settings, &build, Some(progress))?;
     let mut protected_roots = vec![
         build.clone(),
         rl_fs::absolute(Path::new(&settings.anomaly_dir))?,
@@ -1167,19 +1166,24 @@ mod tests {
         );
     }
     #[test]
-    fn stand_missing_mod_and_overlap_fail_before_output_mutation() {
-        let (_t, mut s, b, h) = fixture();
+    fn stand_missing_mod_is_reported_and_skipped_like_mo2() {
+        let (_t, s, b, h) = fixture();
         put(
             Path::new(&s.mo2_dir),
             "profiles/Default/modlist.txt",
-            "+missing\n",
+            "+missing\n+low\n",
         );
-        assert!(
-            materialize(&s, &b, &h, &AtomicBool::new(false), &|_| {})
-                .unwrap_err()
-                .contains("missing")
-        );
-        assert!(!stand_path(&s, &h).exists());
+        let warned = std::sync::atomic::AtomicBool::new(false);
+        materialize(&s, &b, &h, &AtomicBool::new(false), &|p| {
+            if p.phase == "stand_missing_mod" && p.message.contains("missing") { warned.store(true, std::sync::atomic::Ordering::Relaxed); }
+        }).unwrap();
+        assert!(warned.load(std::sync::atomic::Ordering::Relaxed));
+        assert!(stand_path(&s, &h).join(EXE).is_file());
+        assert!(verify_ready(&s, &h));
+    }
+    #[test]
+    fn stand_overlap_fails_before_output_mutation() {
+        let (_t, mut s, b, h) = fixture();
         s.game = "anomaly".into();
         s.stand_root = Path::new(&s.anomaly_dir)
             .parent()

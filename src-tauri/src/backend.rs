@@ -6,25 +6,32 @@ use tauri_plugin_dialog::DialogExt;
 
 pub struct Backend {
     home: PathBuf, selection: Mutex<Selection>, installed_destination: Mutex<Option<PathBuf>>,
-    update: Mutex<Option<LauncherUpdate>>, installer: bool,
+    update: Mutex<Option<LauncherUpdate>>, installer: bool, uninstaller: bool,
     pub busy: AtomicBool, cancel: AtomicBool,
 }
 fn lock<T>(value: &Mutex<T>) -> Result<std::sync::MutexGuard<'_, T>, String> { value.lock().map_err(|_| "Application state is unavailable. Restart RayLink.".into()) }
 impl Backend {
     pub fn is_installer(&self) -> bool { self.installer }
+    pub fn is_uninstaller(&self) -> bool { self.uninstaller }
     pub fn webview_directory(&self) -> Result<PathBuf, String> {
         let path = if self.installer {
             PathBuf::from(std::env::var_os("LOCALAPPDATA").ok_or("Local application cache is unavailable")?).join("RayLinkSetup/WebView")
-        } else { self.home.join("webview") };
+        } else if self.uninstaller { self.home.join("cache/uninstall-webview") } else { self.home.join("webview") };
         settings::check_plain_ancestors(&path)?;
         Ok(path)
     }
     pub fn new() -> Result<Self, String> {
         let exe = std::env::current_exe().map_err(|err| err.to_string())?;
         let home = exe.parent().ok_or("Cannot locate the launcher folder")?.to_path_buf();
-        let installer = lifecycle::is_installer() || (!cfg!(debug_assertions) && !lifecycle::is_installed(&home));
-        let prefs = if installer { Settings::default() } else { settings::load(&home)? };
-        Ok(Self { home, selection: Mutex::new(Selection::new(prefs)), installed_destination: Mutex::new(None), update: Mutex::new(None), installer, busy: AtomicBool::new(false), cancel: AtomicBool::new(false) })
+        let uninstaller = lifecycle::is_uninstaller();
+        if uninstaller && !lifecycle::is_installed(&home) { return Err("Run the uninstaller from its installed RayLink folder".into()); }
+        let installer = !uninstaller && (lifecycle::is_installer() || (!cfg!(debug_assertions) && !lifecycle::is_installed(&home)));
+        let prefs = if installer || uninstaller {
+            let mut prefs = Settings::default();
+            if uninstaller && let Some(language) = lifecycle::installed_language(&home) { prefs.language = language; }
+            prefs
+        } else { settings::load(&home)? };
+        Ok(Self { home, selection: Mutex::new(Selection::new(prefs)), installed_destination: Mutex::new(None), update: Mutex::new(None), installer, uninstaller, busy: AtomicBool::new(false), cancel: AtomicBool::new(false) })
     }
     fn prefs(&self) -> Result<Settings, String> { Ok(lock(&self.selection)?.settings.clone()) }
     fn log(&self, message: &str) {
@@ -38,7 +45,7 @@ impl Backend {
             let _ = writeln!(file, "{time} {}", rl_core::redact::redact(message));
         }
     }
-    fn require_installed(&self) -> Result<(), String> { if self.installer || !lifecycle::is_installed(&self.home) { Err("Run the RayLink installer and select an installation folder first".into()) } else { Ok(()) } }
+    fn require_installed(&self) -> Result<(), String> { if self.installer || self.uninstaller || !lifecycle::is_installed(&self.home) { Err("Open the installed RayLink launcher to use this action".into()) } else { Ok(()) } }
     fn snapshot(&self) -> Result<Snapshot, String> {
         let (prefs, release) = { let selected = lock(&self.selection)?; (selected.settings.clone(), selected.release.clone()) };
         let root = stand::stand_path(&prefs, &self.home);
@@ -46,7 +53,7 @@ impl Backend {
         let running = root.is_dir() && !stand::running_processes(&root)?.is_empty();
         Ok(Snapshot { gamma_version: gamma::version(Path::new(&prefs.mo2_dir)), stand_ready: stand::is_ready(&prefs, &self.home),
             stand_path: root.to_string_lossy().into_owned(), settings: prefs, home_dir: self.home.to_string_lossy().into_owned(), profiles, running,
-            release, launcher_version: env!("CARGO_PKG_VERSION").into(), installer: self.installer, installed_app: lifecycle::is_installed(&self.home) })
+            release, launcher_version: env!("CARGO_PKG_VERSION").into(), installer: self.installer, uninstaller: self.uninstaller, settings_path: settings::location()?.to_string_lossy().into_owned(), installed_app: lifecycle::is_installed(&self.home) })
     }
     fn persist(&self, mut prefs: Settings) -> Result<(), String> { let mut selected = lock(&self.selection)?; if !selected.settings.repo.eq_ignore_ascii_case(&prefs.repo) { prefs.installed.clear(); } settings::save(&self.home, &prefs)?; selected.replace(prefs); Ok(()) }
     fn install_build(&self, reporter: &Reporter) -> Result<(), String> {
@@ -86,10 +93,11 @@ async fn work<T: Send + 'static>(app: AppHandle, operation: impl FnOnce(&Backend
         let _guard = guard;
         let last = Mutex::new((String::new(), std::time::Instant::now()));
         let emitter = |progress: rl_core::dto::Progress| {
+            if progress.phase == "stand_missing_mod" { state.log(&progress.message); }
             if let Ok(mut latest) = last.lock() {
                 let changed = latest.0 != progress.phase;
                 if changed || latest.1.elapsed().as_millis() >= 50 || (progress.total > 0 && progress.current >= progress.total) {
-                    if changed { state.log(&progress.message); }
+                    if changed && progress.phase != "stand_missing_mod" { state.log(&progress.message); }
                     *latest = (progress.phase.clone(), std::time::Instant::now());
                     let _ = app.emit("raylink-progress", progress);
                 }
@@ -169,4 +177,15 @@ async fn work<T: Send + 'static>(app: AppHandle, operation: impl FnOnce(&Backend
         if !lifecycle::is_installed(&root) { return Err("The installed RayLink home is unavailable".into()); }
         Command::new(root.join("RayLinkLauncher.exe")).current_dir(root).spawn().map_err(|err| err.to_string())?; Ok(())
     }).await
+}
+
+#[tauri::command] pub async fn open_uninstaller(app: AppHandle) -> Result<(), String> {
+    let handle = app.clone();
+    work(app, |state, _| { state.require_installed()?; Command::new(state.home.join("uninstall.exe")).current_dir(&state.home).spawn().map_err(|err| err.to_string())?; Ok(()) }).await?;
+    handle.exit(0); Ok(())
+}
+#[tauri::command] pub async fn uninstall_app(app: AppHandle, delete_settings: bool) -> Result<(), String> {
+    let handle = app.clone();
+    work(app, move |state, _| { if !state.uninstaller { return Err("Open the RayLink uninstaller first".into()); } lifecycle::begin_uninstall(&state.home, delete_settings) }).await?;
+    handle.exit(0); Ok(())
 }

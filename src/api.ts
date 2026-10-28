@@ -17,7 +17,7 @@ export async function snapshot(): Promise<Snapshot> {
     settings: { ...defaultSettings, language: params.get('lang') === 'ru' ? 'ru' : 'en' },
     homeDir: 'D:\\RayLink', profiles: [], gammaVersion: '', standPath: 'D:\\RayLink\\gamma',
     standReady: false, running: false, release: null, launcherVersion: '0.2.0',
-    installer: params.get('preview') === 'installer', installedApp: true,
+    installer: params.get('preview') === 'installer', uninstaller: params.get('preview') === 'uninstaller', installedApp: true, settingsPath: 'AppData/Roaming/RayLink/settings.json',
   };
 }
 export async function onProgress(callback: (value: Progress) => void): Promise<() => void> {

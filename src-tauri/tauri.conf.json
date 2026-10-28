@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "RayLink Launcher",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "identifier": "app.raylink.launcher",
   "build": {
     "devUrl": "http://localhost:5173",

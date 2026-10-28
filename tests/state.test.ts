@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { primaryAction, progressPercent, safeLocale } from '../src/state';
 import { defaultSettings, type Snapshot } from '../src/contract';
-const snapshot: Snapshot = { settings: { ...defaultSettings }, homeDir: 'D:/RayLink', profiles: [], gammaVersion: '', standPath: '', standReady: false, running: false, release: null, launcherVersion: '0.2.0', installer: false, installedApp: true };
+const snapshot: Snapshot = { settings: { ...defaultSettings }, homeDir: 'D:/RayLink', profiles: [], gammaVersion: '', standPath: '', standReady: false, running: false, release: null, launcherVersion: '0.2.0', installer: false, uninstaller: false, installedApp: true, settingsPath: 'AppData/RayLink/settings.json' };
 describe('primary action is driven by real installation state', () => {
   it('asks for paths before touching downloads', () => expect(primaryAction(snapshot, false)).toBe('setup'));
   it('builds a configured but unprepared stand', () => expect(primaryAction({ ...snapshot, settings: { ...snapshot.settings, anomalyDir: 'D:/Anomaly', mo2Dir: 'D:/GAMMA', profile: 'G.A.M.M.A' } }, false)).toBe('prepare'));

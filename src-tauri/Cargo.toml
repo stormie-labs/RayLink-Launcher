@@ -5,7 +5,7 @@
 
 [package]
 name = "raylink-launcher"
-version = "0.2.1"
+version = "0.2.2"
 description = "RayLink Launcher: test stand launcher for the RayLink co-op (S.T.A.L.K.E.R. Anomaly / G.A.M.M.A)"
 edition.workspace = true
 rust-version.workspace = true

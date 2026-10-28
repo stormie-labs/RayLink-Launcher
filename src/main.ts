@@ -20,11 +20,13 @@ let installStep = 0;
 let installPath = '';
 let installedPath = '';
 let desktop = true;
+let deleteSettings = false;
 let pendingUpdate: LauncherUpdate | null = null;
 let profiles: string[] = [];
 let focusedBeforePanel: HTMLElement | null = null;
 let unlisten: (() => void) | undefined;
 let actionAbort = false;
+let warnedMissingMods = false;
 const svg = (body: string) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
 const icons = {
   play: svg('<path fill="currentColor" stroke="none" d="M8 5.5v13l11-6.5z"/>'),
@@ -75,7 +77,7 @@ function folderFields(): string {
 function panelMarkup(): string {
   if (panel === 'none') return '';
   const title = panel === 'updates' ? t('whatsNew') : panel === 'setup' ? t('firstRun') : t('settings');
-  const content = panel === 'updates' ? updatesContent() : `<form id="settings-form"><div class="sheet-intro">${panel === 'setup' ? t('firstRunBody') : t('safety')}</div>${panel === 'setup' ? `<div class="choice-row"><button type="button" data-draft-game="anomaly" class="${draft.game === 'anomaly' ? 'chosen' : ''}">Anomaly</button><button type="button" data-draft-game="gamma" class="${draft.game === 'gamma' ? 'chosen' : ''}">G.A.M.M.A.</button></div>` : ''}<section class="form-section"><h3>${t('paths')}</h3>${folderFields()}</section><section class="form-section"><h3>${t('general')}</h3>${field('nick', 'nickname', 'nicknameHint')}<label class="field"><span>${t('language')}</span><select aria-label="${t('language')}" name="language"><option value="en" ${draft.language === 'en' ? 'selected' : ''}>English</option><option value="ru" ${draft.language === 'ru' ? 'selected' : ''}>Русский</option></select></label><label class="check-field"><input type="checkbox" name="reducedMotion" ${draft.reducedMotion ? 'checked' : ''}><span>${t('motion')}<small>${t('motionHint')}</small></span></label></section>${panel === 'settings' ? `<section class="form-section"><h3>${t('storage')}</h3><div class="location-readout"><span>${t('home')}</span><code>${e(state.homeDir)}</code></div>${field('standRoot', 'stand', 'standHint', true)}${field('repo', 'channel', 'channelHint')}<div class="maintenance"><button type="button" data-action="rebuild" ${busy || state.running ? 'disabled' : ''}>${icons.refresh}${t('rebuild')}</button><button type="button" data-action="verify" ${busy ? 'disabled' : ''}>${icons.check}${t('verify')}</button><button type="button" data-action="logs">${icons.file}${t('logs')}</button><button type="button" data-action="open-home">${icons.folder}${t('openHome')}</button></div></section>` : ''}<div class="sheet-bottom"><button type="button" class="secondary" data-action="dismiss">${t('cancel')}</button><button class="primary" type="submit" ${busy ? 'disabled' : ''}>${t('save')}${icons.check}</button></div></form>`;
+  const content = panel === 'updates' ? updatesContent() : `<form id="settings-form"><div class="sheet-intro">${panel === 'setup' ? t('firstRunBody') : t('safety')}</div>${panel === 'setup' ? `<div class="choice-row"><button type="button" data-draft-game="anomaly" class="${draft.game === 'anomaly' ? 'chosen' : ''}">Anomaly</button><button type="button" data-draft-game="gamma" class="${draft.game === 'gamma' ? 'chosen' : ''}">G.A.M.M.A.</button></div>` : ''}<section class="form-section"><h3>${t('paths')}</h3>${folderFields()}</section><section class="form-section"><h3>${t('general')}</h3>${field('nick', 'nickname', 'nicknameHint')}<label class="field"><span>${t('language')}</span><select aria-label="${t('language')}" name="language"><option value="en" ${draft.language === 'en' ? 'selected' : ''}>English</option><option value="ru" ${draft.language === 'ru' ? 'selected' : ''}>Русский</option></select></label><label class="check-field"><input type="checkbox" name="reducedMotion" ${draft.reducedMotion ? 'checked' : ''}><span>${t('motion')}<small>${t('motionHint')}</small></span></label></section>${panel === 'settings' ? `<section class="form-section"><h3>${t('storage')}</h3><div class="location-readout"><span>${t('home')}</span><code>${e(state.homeDir)}</code></div><div class="location-readout"><span>${t('preferencesPath')}</span><code>${e(state.settingsPath)}</code></div>${field('standRoot', 'stand', 'standHint', true)}${field('repo', 'channel', 'channelHint')}<div class="maintenance"><button type="button" data-action="rebuild" ${busy || state.running ? 'disabled' : ''}>${icons.refresh}${t('rebuild')}</button><button type="button" data-action="verify" ${busy ? 'disabled' : ''}>${icons.check}${t('verify')}</button><button type="button" data-action="logs">${icons.file}${t('logs')}</button><button type="button" data-action="open-home">${icons.folder}${t('openHome')}</button><button type="button" data-action="open-uninstaller" ${busy ? 'disabled' : ''}>${icons.close}${t('uninstallButton')}</button></div></section>` : ''}<div class="sheet-bottom"><button type="button" class="secondary" data-action="dismiss">${t('cancel')}</button><button class="primary" type="submit" ${busy ? 'disabled' : ''}>${t('save')}${icons.check}</button></div></form>`;
   return `<div class="scrim" data-action="dismiss"></div><aside class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title"><div class="sheet-heading"><div><span class="sheet-brand">RayLink</span><h2 id="sheet-title">${title}</h2></div><button class="icon-button" data-action="dismiss" aria-label="${t('close')}">${icons.close}</button></div><div class="sheet-scroll">${content}</div></aside>`;
 }
 function updatesContent(): string {
@@ -87,12 +89,15 @@ function installer(): string {
   const body = installStep === 0 ? t('installBody') : installStep === 1 ? t('installFolderBody') : t('installDone');
   return `${chrome()}<main class="installer-content"><div class="installer-copy" key="${installStep}"><div class="install-eyebrow"><span class="status-dot ready"></span>${t('installWelcome')}</div><h1>${heading}</h1><p class="install-description">${body}</p>${installStep === 0 ? `<div class="language-picker" aria-label="${t('installLanguage')}"><span>${icons.globe}${t('installLanguage')}</span><div class="language-options"><button data-language="en" class="${state.settings.language === 'en' ? 'chosen' : ''}"><strong>English</strong><small>English</small>${state.settings.language === 'en' ? icons.check : ''}</button><button data-language="ru" class="${state.settings.language === 'ru' ? 'chosen' : ''}"><strong>Русский</strong><small>Russian</small>${state.settings.language === 'ru' ? icons.check : ''}</button></div></div>` : installStep === 1 ? `<label class="field install-location"><span>${t('installDestination')}</span><div class="input-row"><input id="install-path" value="${e(installPath)}" autocomplete="off" spellcheck="false" ${busy ? 'disabled' : ''}><button class="browse" data-action="browse-install" ${busy ? 'disabled' : ''} aria-label="${t('choose')}">${icons.folder}</button></div></label><label class="check-field"><input id="desktop-shortcut" type="checkbox" ${desktop ? 'checked' : ''} ${busy ? 'disabled' : ''}><span>${t('desktopShortcut')}<small>${t('startMenuShortcut')}</small></span></label><div id="job-slot">${progressMarkup()}</div>` : `<div class="install-success"><span>${icons.check}</span><code>${e(installedPath || installPath)}</code></div>`}<div class="install-actions">${installStep === 1 ? `<button class="secondary" data-action="install-back" ${busy ? 'disabled' : ''}>${icons.back}${t('back')}</button>` : ''}<button class="primary magnetic" data-action="${installStep === 0 ? 'install-next' : installStep === 1 ? 'install-app' : 'launch-installed'}" ${busy ? 'disabled' : ''}>${busy ? '<span class="spinner dark"></span>' : ''}<span>${installStep === 0 ? t('next') : installStep === 1 ? t('installButton') : t('launchApp')}</span>${icons.arrow}<i class="button-shine"></i></button></div></div><div class="installer-brand-caption"><span>RayLink</span><p>${t('announcement')}</p></div></main><footer class="installer-footer"><div class="install-steps">${(['installStepLanguage', 'installStepFolder', 'installStepFinish'] as const).map((key, index) => `<span class="${index === installStep ? 'current' : index < installStep ? 'done' : ''}"><i>${index < installStep ? icons.check : index + 1}</i>${t(key)}</span>`).join('')}</div><span class="version-tag">${e(state.launcherVersion)}</span></footer>`;
 }
+function uninstaller(): string {
+  return `${chrome()}<main class="installer-content"><div class="installer-copy"><div class="install-eyebrow">RayLink</div><h1>${t('uninstallTitle')}</h1><p class="install-description">${t('uninstallBody')}</p><div class="location-readout uninstall-location"><span>${t('home')}</span><code>${e(state.homeDir)}</code></div><label class="check-field"><input id="delete-settings" type="checkbox" ${deleteSettings ? 'checked' : ''} ${busy ? 'disabled' : ''}><span>${t('deleteSettings')}<small>${t('deleteSettingsHint')}</small></span></label><div class="install-actions"><button class="secondary" data-action="close" ${busy ? 'disabled' : ''}>${t('cancel')}</button><button class="primary magnetic" data-action="uninstall-app" ${busy ? 'disabled' : ''}>${busy ? '<span class="spinner dark"></span>' : ''}<span>${t('uninstallButton')}</span>${icons.arrow}</button></div><div id="job-slot">${progressMarkup()}</div></div></main><footer class="installer-footer"><span class="version-tag">${e(state.launcherVersion)}</span></footer>`;
+}
 function render(): void {
   if (!state) return;
   document.documentElement.lang = state.settings.language;
   document.documentElement.classList.toggle('reduce-motion', state.settings.reducedMotion);
-  app.className = `${state.installer ? 'installer-app' : 'launcher-app'} ${panel !== 'none' ? 'panel-open' : ''}`;
-  app.innerHTML = `<div class="background-photo"></div><div class="image-shade"></div>${preview ? `<div class="preview-label">${t('preview')}</div>` : ''}${state.installer ? installer() : launcher()}<div id="notification-slot"></div>`;
+  app.className = `${state.installer || state.uninstaller ? 'installer-app' : 'launcher-app'} ${panel !== 'none' ? 'panel-open' : ''}`;
+  app.innerHTML = `<div class="background-photo"></div><div class="image-shade"></div>${preview ? `<div class="preview-label">${t('preview')}</div>` : ''}${state.uninstaller ? uninstaller() : state.installer ? installer() : launcher()}<div id="notification-slot"></div>`;
   renderNotifications();
   if (panel !== 'none') app.querySelector<HTMLElement>('.sheet button')?.focus({ preventScroll: true });
 }
@@ -104,7 +109,7 @@ function renderNotifications(): void {
 async function refresh(): Promise<void> { state = await snapshot(); }
 async function operate(work: () => Promise<void>): Promise<void> {
   if (busy) return;
-  busy = true; error = ''; progress = null; actionAbort = false; render();
+  busy = true; error = ''; progress = null; actionAbort = false; warnedMissingMods = false; render();
   try { await work(); } catch (reason) { const message = reason instanceof Error ? reason.message : String(reason); if (!actionAbort || message !== 'Operation cancelled') error = message; }
   finally { busy = false; progress = null; render(); }
 }
@@ -141,7 +146,7 @@ async function checkLauncher(auto: boolean): Promise<void> {
 async function applyUpdate(): Promise<void> { await operate(async () => { await command('apply_launcher_update'); }); }
 
 app.addEventListener('submit', event => { event.preventDefault(); if (!(event.target instanceof HTMLFormElement) || event.target.id !== 'settings-form') return; readDraft(); void operate(async () => { state = await command<Snapshot>('save_settings', { settings: draft }); panel = 'none'; flash('saved'); }); });
-app.addEventListener('input', event => { const input = event.target; if (!(input instanceof HTMLInputElement)) return; if (input.id === 'install-path') installPath = input.value; if (input.id === 'desktop-shortcut') desktop = input.checked; });
+app.addEventListener('input', event => { const input = event.target; if (!(input instanceof HTMLInputElement)) return; if (input.id === 'install-path') installPath = input.value; if (input.id === 'desktop-shortcut') desktop = input.checked; if (input.id === 'delete-settings') deleteSettings = input.checked; });
 app.addEventListener('change', event => {
   const target = event.target;
   if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement)) return;
@@ -195,6 +200,8 @@ async function handleClick(element: HTMLElement): Promise<void> {
     case 'browse-install': { const selected = await chooseFolder(t('installDestination')); if (selected) { installPath = selected; render(); } break; }
     case 'install-app': if (!installPath.trim()) { error = t('folderRequired'); renderNotifications(); } else await operate(async () => { installedPath = await command<string>('install_app', { destination: installPath.trim(), language: state.settings.language, desktop }); installStep = 2; }); break;
     case 'launch-installed': await command('open_installed'); await windowAction('close'); break;
+    case 'open-uninstaller': await command('open_uninstaller'); break;
+    case 'uninstall-app': await operate(async () => { await command('uninstall_app', { deleteSettings }); }); break;
   }
 }
 app.addEventListener('pointerdown', event => { if (event.button === 0 && event.target instanceof HTMLElement && event.target.dataset.action === 'drag') void windowAction('drag'); });
@@ -225,6 +232,7 @@ async function boot(): Promise<void> {
   if (state.installer && preview) installPath = 'D:\\RayLink';
   render();
   unlisten = await onProgress(value => {
+    if (value.phase === 'stand_missing_mod' && !warnedMissingMods) { warnedMissingMods = true; flash('skippedMods'); }
     progress = value;
     const slot = document.querySelector('#job-slot');
     if (!slot) return;
@@ -238,7 +246,7 @@ async function boot(): Promise<void> {
     const details = slot.querySelector('.job > small'); if (details) details.textContent = percent === null ? t('progressUnknown') : `${formatCount(value.current)} / ${formatCount(value.total)}`;
     const cancel = slot.querySelector<HTMLElement>('[data-action="cancel"]'); if (cancel) cancel.hidden = !value.cancellable;
   });
-  if (native && !state.installer) {
+  if (native && !state.installer && !state.uninstaller) {
     void checkLauncher(true);
     void command<Release>('check_build').then(refresh).then(() => { if (!busy) render(); }).catch(() => { toast = t('offline'); renderNotifications(); });
     setInterval(() => { if (state.running && !busy && panel === 'none') void refresh().then(render).catch(() => undefined); }, 8000);

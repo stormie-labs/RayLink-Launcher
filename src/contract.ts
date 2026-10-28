@@ -11,7 +11,7 @@ export interface Release {
 export interface Snapshot {
   settings: Settings; homeDir: string; profiles: string[]; gammaVersion: string;
   standPath: string; standReady: boolean; running: boolean; release: Release | null;
-  launcherVersion: string; installer: boolean; installedApp: boolean;
+  launcherVersion: string; installer: boolean; uninstaller: boolean; installedApp: boolean; settingsPath: string;
 }
 export interface Progress { phase: string; message: string; current: number; total: number; cancellable: boolean }
 export interface LauncherUpdate { version: string; release: Release }

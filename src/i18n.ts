@@ -1,5 +1,8 @@
 import type { Language } from './contract';
 export const en = {
+  uninstallTitle: 'Leaving the Zone?', uninstallBody: 'Remove RayLink Launcher and its shortcuts. Your game files, builds and saved games will remain in place.',
+  uninstallButton: 'Uninstall RayLink', deleteSettings: 'Delete launcher settings', deleteSettingsHint: 'Remove your RayLink preferences from AppData. Saved games are kept.', preferencesPath: 'Launcher settings',
+  skippedMods: 'Some enabled mod folders are missing and were skipped. Details are in the log.',
   game: 'Game', updates: 'Updates', settings: 'Settings', play: 'Play', prepare: 'Prepare game', setup: 'Set up game',
   running: 'Game is running', busy: 'Working…', ready: 'Ready to play', notReady: 'A little preparation first',
   build: 'Build', noBuild: 'Not installed', whatsNew: 'What’s new', latestBuild: 'Latest build', check: 'Check for updates',
@@ -36,6 +39,9 @@ export const en = {
 } as const;
 export type MessageKey = keyof typeof en;
 export const ru: Record<MessageKey, string> = {
+  uninstallTitle: 'Покидаешь Зону?', uninstallBody: 'Удалим RayLink Launcher и его ярлыки. Файлы игры, загруженные сборки и сохранения останутся на месте.',
+  uninstallButton: 'Удалить RayLink', deleteSettings: 'Удалить настройки лаунчера', deleteSettingsHint: 'Удалить предпочтения RayLink из AppData. Игровые сохранения останутся.', preferencesPath: 'Настройки лаунчера',
+  skippedMods: 'Некоторые включённые моды не найдены и пропущены. Подробности — в логе.',
   game: 'Игра', updates: 'Обновления', settings: 'Настройки', play: 'Играть', prepare: 'Подготовить игру', setup: 'Настроить игру',
   running: 'Игра запущена', busy: 'Выполняется…', ready: 'Готово к игре', notReady: 'Сначала немного подготовки',
   build: 'Сборка', noBuild: 'Не установлена', whatsNew: 'Что нового', latestBuild: 'Последняя сборка', check: 'Проверить обновления',

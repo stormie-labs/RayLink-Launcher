@@ -110,6 +110,93 @@ pub fn is_installer() -> bool {
             })
             .unwrap_or(false)
 }
+/// Helper modes are consumed by early_mode before any uninstaller window is created.
+pub fn is_uninstaller() -> bool {
+    std::env::current_exe()
+        .is_ok_and(|exe| uninstaller_mode(&exe, &std::env::args_os().skip(1).collect::<Vec<_>>()))
+}
+fn uninstaller_mode(exe: &Path, args: &[std::ffi::OsString]) -> bool {
+    !args
+        .iter()
+        .any(|a| a == "--finish-uninstall" || a == "--apply-update" || a == "--silent-install")
+        && (args.iter().any(|a| a == "--uninstall")
+            || exe
+                .file_name()
+                .is_some_and(|n| n.to_string_lossy().eq_ignore_ascii_case(UNINSTALLER)))
+}
+
+fn uninstall_helper_args(home: &Path, pid: u32, delete_settings: bool) -> Vec<std::ffi::OsString> {
+    let mut args = vec![
+        "--finish-uninstall".into(),
+        home.as_os_str().to_owned(),
+        pid.to_string().into(),
+    ];
+    if delete_settings {
+        args.push("--delete-settings".into());
+    }
+    args
+}
+fn parse_uninstall_helper(args: &[std::ffi::OsString]) -> Result<(PathBuf, u32, bool), String> {
+    let home = args
+        .first()
+        .map(PathBuf::from)
+        .ok_or("Missing uninstall directory")?;
+    let pid = args
+        .get(1)
+        .and_then(|a| a.to_str())
+        .ok_or("Missing uninstaller process ID")?
+        .parse::<u32>()
+        .map_err(|_| "Invalid uninstaller process ID")?;
+    if pid == 0 {
+        return Err("Invalid uninstaller process ID".into());
+    }
+    let delete_settings = match &args[2..] {
+        [] => false,
+        [flag] if flag == "--delete-settings" => true,
+        _ => return Err("Invalid uninstall helper options".into()),
+    };
+    Ok((home, pid, delete_settings))
+}
+
+/// Stage cleanup, then let the caller close its own uninstaller window and exit.
+pub fn begin_uninstall(home: &Path, delete_settings: bool) -> Result<(), String> {
+    let exe = std::env::current_exe()
+        .map_err(|e| format!("Cannot locate the uninstaller: {}", error_text(e)))?;
+    validate_uninstaller(&exe, home)?;
+    let _lock = LifecycleLock::acquire(home)?;
+    validate_uninstaller(&exe, home)?;
+    ensure_launcher_stopped(home)?;
+    let cache = home.join("cache");
+    ensure_dir(&cache)?;
+    let helper = new_work_dir(&cache, "launcher-uninstall")?.join("RayLinkCleanup.exe");
+    fs::copy(&exe, &helper)
+        .map_err(|e| format!("Cannot stage the uninstall helper: {}", error_text(e)))?;
+    Command::new(&helper)
+        .args(uninstall_helper_args(
+            home,
+            std::process::id(),
+            delete_settings,
+        ))
+        .current_dir(home)
+        .spawn()
+        .map_err(|e| format!("Cannot start the uninstall helper: {}", error_text(e)))?;
+    Ok(())
+}
+fn validate_uninstaller(exe: &Path, home: &Path) -> Result<(), String> {
+    load_marker(home)?;
+    regular(exe)?;
+    if !same_path(exe, &home.join(UNINSTALLER)) {
+        return Err("Run uninstall.exe from the installed RayLink directory".into());
+    }
+    Ok(())
+}
+fn ensure_launcher_stopped(home: &Path) -> Result<(), String> {
+    #[cfg(windows)]
+    native::ensure_launcher_stopped(home)?;
+    #[cfg(not(windows))]
+    let _ = home;
+    Ok(())
+}
 pub fn is_installed(home: &Path) -> bool {
     load_marker(home).is_ok()
 }
@@ -159,23 +246,7 @@ pub fn early_mode() -> Result<bool, String> {
     let exe = std::env::current_exe()
         .map_err(|e| format!("Cannot locate the executable: {e}", e = error_text(e)))?;
     if let Some(index) = args.iter().position(|a| a == "--finish-uninstall") {
-        let home = args
-            .get(index + 1)
-            .map(PathBuf::from)
-            .ok_or("Missing uninstall directory")?;
-        let pid = args
-            .get(index + 2)
-            .and_then(|a| a.to_str())
-            .ok_or("Missing uninstaller process ID")?
-            .parse::<u32>()
-            .map_err(|_| "Invalid uninstaller process ID")?;
-        let original = args
-            .get(index + 3)
-            .and_then(|a| a.to_str())
-            .ok_or("Missing original executable name")?;
-        if original != LAUNCHER && original != UNINSTALLER {
-            return Err("Invalid original executable name".into());
-        }
+        let (home, pid, delete_settings) = parse_uninstall_helper(&args[index + 1..])?;
         load_marker(&home)?;
         let parent = exe.parent().ok_or("Missing uninstall helper directory")?;
         if exe.file_name().is_none_or(|n| n != "RayLinkCleanup.exe")
@@ -188,8 +259,9 @@ pub fn early_mode() -> Result<bool, String> {
         {
             return Err("The uninstall helper is outside the owned launcher cache".into());
         }
-        wait_for_launcher(pid, &home.join(original))?;
-        uninstall_from(&home)?;
+        regular(&exe)?;
+        wait_for_launcher(pid, &home.join(UNINSTALLER))?;
+        uninstall_from(&home, delete_settings)?;
         return Ok(true);
     }
     if let Some(index) = args.iter().position(|a| a == "--apply-update") {
@@ -231,44 +303,11 @@ pub fn early_mode() -> Result<bool, String> {
         )?;
         return Ok(true);
     }
-    let uninstall = args.iter().any(|a| a == "--uninstall")
-        || exe
-            .file_name()
-            .is_some_and(|n| n.to_string_lossy().eq_ignore_ascii_case(UNINSTALLER));
-    if uninstall {
+    if uninstaller_mode(&exe, &args) && args.iter().any(|a| a == "--yes") {
         let home = exe
             .parent()
             .ok_or("Cannot determine the installation directory")?;
-        let marker = load_marker(home)?;
-        #[cfg(windows)]
-        if !marker.test_install
-            && !args.iter().any(|a| a == "--yes")
-            && !native::confirm_uninstall(&marker.language)
-        {
-            return Ok(true);
-        }
-        let _ = marker;
-        let original = if same_path(&exe, &home.join(UNINSTALLER)) {
-            UNINSTALLER
-        } else if same_path(&exe, &home.join(LAUNCHER)) {
-            LAUNCHER
-        } else {
-            return Err("Run the uninstaller from the installed RayLink directory".into());
-        };
-        // A separate copy can remove either installed executable after it exits without elevation.
-        let cache = home.join("cache");
-        ensure_dir(&cache)?;
-        let helper = new_work_dir(&cache, "launcher-uninstall")?.join("RayLinkCleanup.exe");
-        fs::copy(&exe, &helper)
-            .map_err(|e| format!("Cannot stage the uninstall helper: {e}", e = error_text(e)))?;
-        Command::new(&helper)
-            .arg("--finish-uninstall")
-            .arg(home)
-            .arg(std::process::id().to_string())
-            .arg(original)
-            .current_dir(home)
-            .spawn()
-            .map_err(|e| format!("Cannot start the uninstall helper: {e}", e = error_text(e)))?;
+        begin_uninstall(home, args.iter().any(|a| a == "--delete-settings"))?;
         return Ok(true);
     }
     Ok(false)
@@ -903,10 +942,18 @@ fn wait_for_launcher(pid: u32, expected: &Path) -> Result<(), String> {
         Err("Launcher self-update requires Windows".into())
     }
 }
-fn uninstall_from(home: &Path) -> Result<(), String> {
+fn uninstall_from(home: &Path, delete_settings: bool) -> Result<(), String> {
+    uninstall_with_settings(home, delete_settings, crate::settings::remove_for_home)
+}
+fn uninstall_with_settings(
+    home: &Path,
+    delete_settings: bool,
+    remove_settings: impl FnOnce(&Path) -> Result<bool, String>,
+) -> Result<(), String> {
     load_marker(home)?;
     let _lock = LifecycleLock::acquire(home)?;
     let marker = load_marker(home)?;
+    ensure_launcher_stopped(home)?;
     // Retain delete-capable handles through removal. A read/write-only preflight
     // misses handles that allow writing but deny deletion of the second executable.
     let mut owned_files = Vec::new();
@@ -935,6 +982,11 @@ fn uninstall_from(home: &Path) -> Result<(), String> {
                     .map_err(|_| "Close RayLink Launcher before uninstalling")?,
             );
         }
+    }
+    // The store enforces AppData ownership. Never inspect or remove legacy credentials here.
+    // Run only after every owned file has passed the read/write/delete preflight.
+    if delete_settings {
+        remove_settings(home)?;
     }
     #[cfg(windows)]
     if !marker.test_install {
@@ -987,14 +1039,8 @@ mod native {
                     QueryFullProcessImageNameW, WaitForSingleObject,
                 },
             },
-            UI::{
-                Shell::{
-                    FOLDERID_Desktop, FOLDERID_LocalAppData, FOLDERID_Programs,
-                    SHGetKnownFolderPath,
-                },
-                WindowsAndMessaging::{
-                    IDYES, MB_DEFBUTTON2, MB_ICONQUESTION, MB_YESNO, MessageBoxW,
-                },
+            UI::Shell::{
+                FOLDERID_Desktop, FOLDERID_LocalAppData, FOLDERID_Programs, SHGetKnownFolderPath,
             },
         },
         core::GUID,
@@ -1051,20 +1097,80 @@ mod native {
     pub(super) fn desktop() -> Option<PathBuf> {
         folder(&FOLDERID_Desktop)
     }
-    pub(super) fn confirm_uninstall(language: &str) -> bool {
-        let title = wide(OsStr::new(PRODUCT));
-        let message = wide(OsStr::new(if language == "ru" {
-            "Удалить RayLink Launcher?\n\nСборки, кэш, настройки, подготовленные игры и сохранения останутся на месте."
-        } else { "Uninstall RayLink Launcher?\n\nYour builds, cache, settings, game stands and saved games will be kept." }));
-        // SAFETY: Both strings are terminated and alive for the modal call; no owner window is required.
-        unsafe {
-            MessageBoxW(
-                ptr::null_mut(),
-                message.as_ptr(),
-                title.as_ptr(),
-                MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2,
-            ) == IDYES
+    pub(super) fn ensure_launcher_stopped(home: &Path) -> Result<(), String> {
+        use windows_sys::Win32::{
+            Foundation::{ERROR_NO_MORE_FILES, INVALID_HANDLE_VALUE},
+            System::Diagnostics::ToolHelp::{
+                CreateToolhelp32Snapshot, PROCESSENTRY32W, Process32FirstW, Process32NextW,
+                TH32CS_SNAPPROCESS,
+            },
+        };
+        struct Handle(windows_sys::Win32::Foundation::HANDLE);
+        impl Drop for Handle {
+            fn drop(&mut self) {
+                // SAFETY: Each owned handle is closed exactly once.
+                unsafe {
+                    CloseHandle(self.0);
+                }
+            }
         }
+        // SAFETY: Snapshot entries and image buffers have the documented sizes.
+        // Processes are opened for query/wait only; the user process is never terminated.
+        unsafe {
+            let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+            if snapshot == INVALID_HANDLE_VALUE {
+                return Err("Cannot enumerate running launcher processes".into());
+            }
+            let snapshot = Handle(snapshot);
+            let mut entry: PROCESSENTRY32W = std::mem::zeroed();
+            entry.dwSize = std::mem::size_of::<PROCESSENTRY32W>() as u32;
+            let mut more = Process32FirstW(snapshot.0, &mut entry);
+            while more != 0 {
+                let len = entry
+                    .szExeFile
+                    .iter()
+                    .position(|c| *c == 0)
+                    .unwrap_or(entry.szExeFile.len());
+                if String::from_utf16_lossy(&entry.szExeFile[..len]).eq_ignore_ascii_case(LAUNCHER)
+                {
+                    let process = OpenProcess(
+                        PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SYNCHRONIZE,
+                        0,
+                        entry.th32ProcessID,
+                    );
+                    if process.is_null() {
+                        if GetLastError() != ERROR_INVALID_PARAMETER {
+                            return Err("Cannot inspect a running RayLink Launcher; close it before uninstalling".into());
+                        }
+                    } else {
+                        let process = Handle(process);
+                        if WaitForSingleObject(process.0, 0) != WAIT_OBJECT_0 {
+                            let mut buffer = vec![0u16; 32768];
+                            let mut count = buffer.len() as u32;
+                            if QueryFullProcessImageNameW(
+                                process.0,
+                                0,
+                                buffer.as_mut_ptr(),
+                                &mut count,
+                            ) == 0
+                            {
+                                return Err("Cannot identify a running RayLink Launcher; close it before uninstalling".into());
+                            }
+                            let actual =
+                                PathBuf::from(OsString::from_wide(&buffer[..count as usize]));
+                            if same_path(&actual, &home.join(LAUNCHER)) {
+                                return Err("Close RayLink Launcher before uninstalling".into());
+                            }
+                        }
+                    }
+                }
+                more = Process32NextW(snapshot.0, &mut entry);
+            }
+            if GetLastError() != ERROR_NO_MORE_FILES {
+                return Err("Cannot finish enumerating running launcher processes".into());
+            }
+        }
+        Ok(())
     }
     pub(super) fn wait_for_launcher(pid: u32, expected: &Path) -> Result<(), String> {
         // SAFETY: Read/query rights only. Keep the handle through the wait to avoid PID reuse.
@@ -1081,12 +1187,23 @@ mod native {
                     Err("Cannot inspect the original launcher process".into())
                 };
             }
+            // A caller can retain the handle after the original process exits.
+            // Such a process no longer has an image to query or to wait for.
+            if WaitForSingleObject(handle, 0) == WAIT_OBJECT_0 {
+                CloseHandle(handle);
+                return Ok(());
+            }
             let mut buf = vec![0u16; 32768];
             let mut count = buf.len() as u32;
             let query = QueryFullProcessImageNameW(handle, 0, buf.as_mut_ptr(), &mut count);
             if query == 0 {
+                let exited = WaitForSingleObject(handle, 0) == WAIT_OBJECT_0;
                 CloseHandle(handle);
-                return Err("Cannot identify the original launcher executable".into());
+                return if exited {
+                    Ok(())
+                } else {
+                    Err("Cannot identify the original launcher executable".into())
+                };
             }
             let actual = PathBuf::from(OsString::from_wide(&buf[..count as usize]));
             if !same_path(&actual, expected) {
@@ -1198,10 +1315,14 @@ mod native {
         let prefix: Vec<u16> = r"\\?\".encode_utf16().collect();
         let unc: Vec<u16> = r"\\?\UNC\".encode_utf16().collect();
         if raw.starts_with(&unc) {
-            let mut result = vec![92, 92]; result.extend_from_slice(&raw[unc.len()..]);
+            let mut result = vec![92, 92];
+            result.extend_from_slice(&raw[unc.len()..]);
             PathBuf::from(OsString::from_wide(&result))
-        } else if raw.starts_with(&prefix) { PathBuf::from(OsString::from_wide(&raw[prefix.len()..])) }
-        else { path.to_path_buf() }
+        } else if raw.starts_with(&prefix) {
+            PathBuf::from(OsString::from_wide(&raw[prefix.len()..]))
+        } else {
+            path.to_path_buf()
+        }
     }
     fn shortcut(path: &Path, target: &Path, home: &Path) -> Result<(), String> {
         let _apartment = Apartment::new()?;
@@ -1339,7 +1460,10 @@ mod native {
             ("DisplayVersion", OsString::from(version)),
             ("Publisher", OsString::from("stormie-labs")),
             ("InstallLocation", shell_path(home).into_os_string()),
-            ("DisplayIcon", shell_path(&home.join(LAUNCHER)).into_os_string()),
+            (
+                "DisplayIcon",
+                shell_path(&home.join(LAUNCHER)).into_os_string(),
+            ),
             (
                 "UninstallString",
                 OsString::from(format!(
@@ -1427,6 +1551,20 @@ mod native {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(windows)]
+    #[test]
+    fn lifecycle_exited_parent_with_retained_handle_can_be_cleaned_up() {
+        use std::os::windows::process::CommandExt;
+        let exe =
+            std::path::PathBuf::from(std::env::var_os("WINDIR").unwrap()).join("System32/cmd.exe");
+        let mut child = std::process::Command::new(&exe)
+            .args(["/d", "/c", "exit", "0"])
+            .creation_flags(0x08000000)
+            .spawn()
+            .unwrap();
+        child.wait().unwrap();
+        super::wait_for_launcher(child.id(), &exe).unwrap();
+    }
     use super::*;
     use crate::dto::Release;
     use std::fs;
@@ -1446,6 +1584,141 @@ mod tests {
             asset_name: "RayLinkSetup.exe".into(), asset_url: "https://github.com/stormie-labs/RayLink-Launcher/releases/download/v0.3.0/RayLinkSetup.exe".into(),
             asset_size: 1024, sha256: Some("a".repeat(64)),
         } }
+    }
+    #[test]
+    fn lifecycle_uninstall_helper_flags_are_explicit_and_round_trip() {
+        let home = Path::new(r"D:\RayLink test");
+        for delete_settings in [false, true] {
+            let args = uninstall_helper_args(home, 42, delete_settings);
+            let (actual_home, pid, actual_delete) = parse_uninstall_helper(&args[1..]).unwrap();
+            assert_eq!(actual_home, home);
+            assert_eq!(pid, 42);
+            assert_eq!(actual_delete, delete_settings);
+            assert_eq!(args.len(), if delete_settings { 4 } else { 3 });
+        }
+        for args in [
+            vec!["home", "0"],
+            vec!["home", "invalid"],
+            vec!["home", "42", "--yes"],
+            vec!["home", "42", "--delete-settings", "extra"],
+        ] {
+            let args = args
+                .into_iter()
+                .map(std::ffi::OsString::from)
+                .collect::<Vec<_>>();
+            assert!(parse_uninstall_helper(&args).is_err());
+        }
+    }
+    #[test]
+    fn lifecycle_uninstaller_detection_defers_helpers() {
+        for name in [UNINSTALLER, "UNINSTALL.EXE", LAUNCHER] {
+            let exe = Path::new(name);
+            let none = Vec::new();
+            assert_eq!(uninstaller_mode(exe, &none), name != LAUNCHER);
+            assert!(uninstaller_mode(exe, &["--uninstall".into()]));
+            for helper in ["--finish-uninstall", "--apply-update", "--silent-install"] {
+                assert!(!uninstaller_mode(
+                    exe,
+                    &["--uninstall".into(), helper.into()]
+                ));
+            }
+        }
+    }
+    #[test]
+    fn lifecycle_settings_removal_is_opt_in_and_runs_after_owned_file_preflight() {
+        let f = fixture();
+        let source = f.path().join("setup");
+        fs::write(&source, b"MZfixture").unwrap();
+        for delete_settings in [false, true] {
+            let home = f
+                .path()
+                .join(if delete_settings { "delete" } else { "keep" });
+            install_from(&source, &home, "en", false, true, &|_| {}).unwrap();
+            let store = f.path().join("synthetic-settings.json");
+            fs::write(&store, b"settings").unwrap();
+            uninstall_with_settings(&home, delete_settings, |owner| {
+                assert!(same_path(owner, &home));
+                assert!(home.join(MARKER).exists());
+                fs::remove_file(&store).unwrap();
+                Ok(true)
+            })
+            .unwrap();
+            assert_eq!(store.exists(), !delete_settings);
+        }
+        let unowned = f.path().join("unowned");
+        assert!(
+            uninstall_with_settings(&unowned, true, |_| panic!(
+                "Unowned home reached settings store"
+            ))
+            .is_err()
+        );
+    }
+    #[test]
+    fn lifecycle_uninstall_requires_owned_uninstaller_and_preserves_files_on_store_failure() {
+        let f = fixture();
+        let source = f.path().join("setup");
+        let home = f.path().join("RayLink");
+        fs::write(&source, b"MZfixture").unwrap();
+        install_from(&source, &home, "en", false, true, &|_| {}).unwrap();
+        assert!(validate_uninstaller(&home.join(UNINSTALLER), &home).is_ok());
+        assert!(validate_uninstaller(&home.join(LAUNCHER), &home).is_err());
+        assert!(validate_uninstaller(&source, &home).is_err());
+        assert!(begin_uninstall(&home, true).is_err()); // The test runner is not uninstall.exe.
+        let marker = fs::read(home.join(MARKER)).unwrap();
+        assert!(
+            uninstall_with_settings(&home, true, |_| Err("Synthetic store failure".into()))
+                .is_err()
+        );
+        assert_eq!(fs::read(home.join(MARKER)).unwrap(), marker);
+        assert_eq!(fs::read(home.join(LAUNCHER)).unwrap(), b"MZfixture");
+        assert_eq!(fs::read(home.join(UNINSTALLER)).unwrap(), b"MZfixture");
+    }
+    #[cfg(windows)]
+    #[test]
+    fn lifecycle_uninstall_rejects_live_launcher_only_in_selected_home_without_killing_it() {
+        use std::process::Stdio;
+        let f = fixture();
+        let home = f.path().join("RayLink");
+        let source = f.path().join("setup");
+        fs::write(&source, b"MZfixture").unwrap();
+        install_from(&source, &home, "en", false, true, &|_| {}).unwrap();
+        let system = std::env::var_os("SystemRoot").unwrap();
+        fs::copy(
+            Path::new(&system).join("System32/ping.exe"),
+            home.join(LAUNCHER),
+        )
+        .unwrap();
+        struct FixtureProcess(std::process::Child);
+        impl Drop for FixtureProcess {
+            fn drop(&mut self) {
+                // Only the synthetic process created by this test is stopped at teardown.
+                let _ = self.0.kill();
+                let _ = self.0.wait();
+            }
+        }
+        let mut child = FixtureProcess(
+            Command::new(home.join(LAUNCHER))
+                .args(["-t", "127.0.0.1"])
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+                .unwrap(),
+        );
+        assert!(ensure_launcher_stopped(&home).is_err());
+        assert!(ensure_launcher_stopped(&f.path().join("other")).is_ok());
+        assert!(
+            uninstall_with_settings(&home, true, |_| panic!(
+                "Live launcher reached settings removal"
+            ))
+            .is_err()
+        );
+        assert!(
+            child.0.try_wait().unwrap().is_none(),
+            "Uninstall stopped the running launcher"
+        );
+        assert!(is_installed(&home));
+        drop(child);
+        assert!(ensure_launcher_stopped(&home).is_ok());
     }
     #[test]
     fn lifecycle_version_comparison_is_semantic_and_rejects_game_tags() {
@@ -1517,7 +1790,7 @@ mod tests {
         install_from(&source, &home, "en", false, true, &|_| {}).unwrap();
         assert_eq!(fs::read(home.join(LAUNCHER)).unwrap(), b"MZfixture-two");
         assert_eq!(installed_language(&home).as_deref(), Some("en"));
-        uninstall_from(&home).unwrap();
+        uninstall_from(&home, false).unwrap();
         assert!(!home.join(LAUNCHER).exists());
         assert!(!home.join(MARKER).exists());
         assert!(home.join("settings.json").exists());
@@ -1584,7 +1857,7 @@ mod tests {
         fs::create_dir(&other).unwrap();
         fs::copy(home.join(MARKER), other.join(MARKER)).unwrap();
         assert!(!is_installed(&other));
-        assert!(uninstall_from(&other).is_err());
+        assert!(uninstall_from(&other, false).is_err());
     }
     #[cfg(windows)]
     #[test]
@@ -1631,12 +1904,17 @@ mod tests {
             .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE)
             .open(home.join(UNINSTALLER))
             .unwrap();
-        assert!(uninstall_from(&home).is_err());
+        assert!(
+            uninstall_with_settings(&home, true, |_| panic!(
+                "Failed file preflight reached settings removal"
+            ))
+            .is_err()
+        );
         assert_eq!(fs::read(home.join(LAUNCHER)).unwrap(), b"MZold");
         assert_eq!(fs::read(home.join(UNINSTALLER)).unwrap(), b"MZold");
         assert_eq!(fs::read(home.join(MARKER)).unwrap(), marker);
         drop(lock);
-        uninstall_from(&home).unwrap();
+        uninstall_from(&home, false).unwrap();
     }
     #[cfg(windows)]
     #[test]
