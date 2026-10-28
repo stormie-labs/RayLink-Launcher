@@ -1,0 +1,14 @@
+[package]
+name = "rl-tool"
+version = "0.1.0"
+description = "RayLink CLI for publish.ps1 and tests: manifest check (T6), fakegame (T9), sign (T11)"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rl-core.workspace = true
+serde_json.workspace = true

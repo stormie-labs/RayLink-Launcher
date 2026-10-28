@@ -1,1 +1,8 @@
 temp/
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/
+releases/
+test-results/
+playwright-report/
