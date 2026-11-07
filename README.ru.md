@@ -10,6 +10,7 @@
   <a href="https://github.com/stormie-labs/RayLink-Launcher/releases/latest/download/RayLinkSetup.exe"><b>Скачать для Windows</b></a>
   &nbsp;·&nbsp; <a href="https://github.com/stormie-labs/RayLink-Launcher/releases/latest">Что нового</a>
   &nbsp;·&nbsp; <a href="https://github.com/stormie-labs/RayLink-Launcher/issues/new">Сообщить о проблеме</a>
+  &nbsp;·&nbsp; <a href="https://discord.gg/QuYN4CtJTz"><b>Discord</b></a>
 </p>
 
 <p align="center">Windows 10 / 11 · x64 · English / Русский · Бета</p>
