@@ -45,15 +45,17 @@ Saves, `user.ltx` and logs live in `%APPDATA%\RayLink\profiles\<nick>\<game>`. R
 
 The **+** on the rail opens **Game → Folders → Done**. For G.A.M.M.A. you pick the Mod Organizer 2 folder; the Anomaly folder and the active profile are taken from Mod Organizer and checked right away. Games are shared by all profiles.
 
+**No game yet? The launcher downloads it.** On the Folders step pick **Download** instead of "I already have it" and choose an empty folder. For G.A.M.M.A. the launcher installs Anomaly 1.5.3 and every mod of the pack from the official GAMMA list; for Anomaly, the game itself. A download can be paused and resumed, and its progress shows on the downloads icon. This mode is in beta.
+
 ## Install
 
 <p align="center"><img src="assets/installer-en.webp" width="880" alt="Installer: language choice between English and Russian, steps Language, Folder, Install, Done."></p>
 
 1. **Run [RayLinkSetup.exe](https://github.com/stormie-labs/RayLink-Launcher/releases/latest/download/RayLinkSetup.exe).** Choose a language and a folder **on the same drive as your games**. The launcher, downloaded builds and cache live there.
-2. **Add your game.** Press **+** and point the launcher to your **Anomaly 1.5.3** folder; for G.A.M.M.A. to its Mod Organizer folder.
+2. **Add your game.** Press **+** and point the launcher to your **Anomaly 1.5.3** folder; for G.A.M.M.A. to its Mod Organizer folder. No game yet? Pick **Download** and the launcher installs it.
 3. **Play.** The first press downloads the co-op build and prepares a separate game folder; after that, Play starts the game. Host or join a session from the game.
 
-You need an existing Anomaly 1.5.3 installation; G.A.M.M.A. is optional and must already be installed. RayLink does not include either game. Internet access is needed for builds and updates.
+Use your existing Anomaly 1.5.3 and G.A.M.M.A., or let the launcher download them. RayLink does not include either game: they come from their official sources. Internet access is needed for builds, downloads and updates.
 
 ### Keep game files on the same drive
 
